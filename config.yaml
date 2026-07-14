@@ -1,0 +1,26 @@
+# =============================================================================
+# 프로젝트 공통 설정 (최소)
+# -----------------------------------------------------------------------------
+# 경로와 Target 같은 "어디에나 필요한 값"만 둔다.
+# 분리 방법 · 전처리 · 임계값 같은 "분석 결정"은 노트북과 docs 에서 직접 정한다.
+# =============================================================================
+
+project:
+  random_state: 42
+
+data:
+  raw_path: "data/raw/churn.csv"   # data/raw 아래 원본 CSV (원본 수정 금지)
+  encoding: "utf-8"                # 필요 시 cp949 / euc-kr
+  sep: ","
+
+target:
+  column: "Churn"                  # 예측할 Target 컬럼
+  positive_label: "Yes"            # "이탈(=1)"에 해당하는 원본 값
+  meaning:
+    "1": "이탈 고객 (churn)"
+    "0": "유지 고객 (retained)"
+
+output:
+  # 노트북 02에서 학습한 최종 모델을 여기에 저장 -> Streamlit/predict.py 가 불러온다.
+  model_path: "models/churn_pipeline.joblib"
+  metrics_path: "artifacts/metrics.csv"   # 성능 탭이 읽는 모델 비교표

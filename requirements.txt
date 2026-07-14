@@ -1,0 +1,22 @@
+# 공통 골격 필수 패키지
+pandas>=2.0
+numpy>=1.24
+scikit-learn>=1.3
+pyyaml>=6.0
+joblib>=1.3
+streamlit>=1.30
+
+# 부스팅 모델 (노트북 03에서 비교용으로 추가 권장)
+xgboost>=2.0
+# lightgbm>=4.0
+
+# 불균형 처리(SMOTE)를 쓸 경우에만
+# imbalanced-learn>=0.12
+
+# 시각화 / 노트북 (선택)
+matplotlib>=3.7
+seaborn>=0.13
+jupyter>=1.0
+
+# 테스트
+pytest>=8.0
