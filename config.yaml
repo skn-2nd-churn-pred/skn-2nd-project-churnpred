@@ -9,8 +9,9 @@ project:
   random_state: 42
 
 data:
-  raw_path: "data/raw/churn.csv"   # data/raw 아래 원본 CSV (원본 수정 금지)
-  encoding: "utf-8"                # 필요 시 cp949 / euc-kr
+  raw_path: "data/raw/cell2celltrain.csv"       # 학습용 원본 (원본 수정 금지)
+  holdout_path: "data/raw/cell2cellholdout.csv" # 라벨 없음 → Test 금지, Streamlit 시연용만
+  encoding: "utf-8"                             # 필요 시 cp949 / euc-kr
   sep: ","
 
 target:
