@@ -16,3 +16,7 @@ __pycache__/
 .DS_Store
 .idea/
 .vscode/
+
+data/interim/
+data/processed/
+artifacts/*.joblib
