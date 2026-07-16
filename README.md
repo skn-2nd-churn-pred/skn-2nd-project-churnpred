@@ -68,3 +68,17 @@ data/raw  models  artifacts             # 원본(Git 제외) · 모델 · 지표
 | 발표자료 | `presentation.pdf` |
 
 > 발표 전 체크: README·발표자료의 성능 수치 = `artifacts/metrics.csv` 실제 수치와 일치할 것.
+
+## 커밋 메시지 규칙
+
+`YYYYMMDD-작업자-작업내용` 형식으로 작성한다.
+
+```
+20260716-홍길동-RandomForest, XGBoost 비교 추가
+20260716-김영희-HandsetPrice Unknown 결측 처리 수정
+20260717-이철수-군집 프로필 결과 report.md C파트에 반영
+```
+
+- 날짜는 커밋하는 당일 날짜(`YYYYMMDD`)
+- 작업자는 본인 이름
+- 작업내용은 한 줄로 간단히, 무엇을 했는지 알아볼 수 있게
