@@ -2,7 +2,7 @@
 
 ## 1. 프로젝트 목적
 
-고객의 통화·요금·단말기·생활 정보를 활용해 고객 이탈 여부(`Churn`)를 예측한다.
+고객의 통화·요금·단말기·인구통계 정보를 활용해 고객 이탈 여부(`Churn`)를 예측한다.
 특히 이탈 방어 활동(Retention) 정보를 포함했을 때와 제외했을 때의 성능 차이를 비교했다.
 
 ## 2. 데이터 및 실험 설계
@@ -72,7 +72,25 @@
 
 따라서 유지팀의 접촉 비용과 이탈 고객을 놓쳤을 때의 비용을 함께 고려해 운영 임계값을 조정할 수 있다.
 
-## 6. 혼동행렬 해석
+## 6. Accuracy와 기준선 0.5 해석
+
+> 최종 Retention 포함 모델의 Accuracy는 62.1%이다. 이는 이탈 고객을 최대한 놓치지 않도록 클래스 가중치를 적용하고, 기준선 0.5에서 Recall을 우선했기 때문에 일부 유지 고객도 이탈 위험군으로 분류한 결과이다.
+
+현재 기준선 0.5는 이탈 확률이 50% 이상인 고객을 이탈 위험군으로 분류한다. 아래는 기준선을 바꾸었을 때의 검증 성능과 고객 접촉 규모 변화다.
+
+| threshold | accuracy | precision | recall | f1 | predicted_churn_customers | true_positive | false_positive | false_negative |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 0.3000 | 0.4032 | 0.3188 | 0.9422 | 0.4764 | 8695.0 | 2772.0 | 5923.0 | 170.0 |
+| 0.4000 | 0.5145 | 0.3550 | 0.8382 | 0.4987 | 6947.0 | 2466.0 | 4481.0 | 476.0 |
+| 0.5000 | 0.6206 | 0.4019 | 0.6492 | 0.4965 | 4752.0 | 1910.0 | 2842.0 | 1032.0 |
+| 0.6000 | 0.7059 | 0.4847 | 0.3277 | 0.3910 | 1989.0 | 964.0 | 1025.0 | 1978.0 |
+| 0.7000 | 0.7185 | 0.5904 | 0.0755 | 0.1338 | 376.0 | 222.0 | 154.0 | 2720.0 |
+
+- 기준선을 낮추면 실제 이탈 고객을 더 많이 탐지할 수 있지만, 유지 고객에게도 더 많은 방어 활동을 하게 된다.
+- 기준선을 높이면 접촉 대상과 오탐은 줄지만, 실제 이탈 고객을 더 많이 놓칠 수 있다.
+- 최적 기준선은 캠페인 예산, 유지 연락 비용, 이탈 고객을 놓쳤을 때의 비용을 함께 고려해 결정한다.
+
+## 7. 혼동행렬 해석
 
 ### Retention 포함 모델
 
@@ -88,7 +106,7 @@
 | 유지(0) | 4,443 | 2,825 |
 | 이탈(1) | 1,062 | 1,880 |
 
-## 7. 전체 최적 모델의 주요 피처
+## 8. 전체 최적 모델의 주요 피처
 
 순열 중요도(Permutation Importance) 기준 상위 10개 피처다. 변수를 무작위로 섞었을 때 ROC-AUC가 크게 떨어질수록 모델 예측에 중요한 정보라는 뜻이다.
 
@@ -105,27 +123,27 @@
 
 피처 중요도는 모델 예측에 유용한 정도를 뜻하며, 해당 변수가 이탈의 직접 원인임을 증명하지는 않는다.
 
-## 8. 운영 제안
+## 9. 운영 제안
 
 1. **사전 이탈 예방**: 유지팀 접촉 정보가 아직 없는 시점이라면 `Retention 제외 모델`을 사용한다.
 2. **접촉 이력 반영 위험도 판단**: 유지 활동 정보까지 확보된 경우 `Retention 포함 모델`을 사용한다.
 3. 단말기 사용 기간, 서비스 이용 기간, 통화 시간 변화가 큰 고객을 우선 관리 후보로 검토한다.
 4. 임계값 0.5는 기본값이므로, 캠페인 예산과 고객 접촉 비용에 맞춰 Recall과 Precision의 균형을 조정한다.
 
-## 9. 한계 및 유의사항
+## 10. 한계 및 유의사항
 
 - Retention 변수는 이탈 판정 시점 이후에 기록된 정보라면 데이터 누수가 될 수 있으므로 측정 시점을 반드시 확인해야 한다.
-- 최종 발표 전 교차검증 또는 test 데이터로 성능을 추가 확인하여 신뢰도를 높이도록 한다.
+- 최종 발표 전 교차검증 또는 test 데이터로 성능을 추가 확인하여 신뢰도를 높인다.
 - 피처 중요도는 인과관계가 아니라 예측 기여도다.
 
-## 10. 생성 산출물
+## 11. 생성 산출물
 
 - 모델: `models/histgradientboosting_with_retention.joblib`
 - 모델: `models/histgradientboosting_without_retention.joblib`
 - 상세 리포트: `reports/modeling_report.md`
-- 발표용 성능 그래프: `artifacts/modeling/presentation_01_model_performance.png`
-- 발표용 ROC 곡선: `artifacts/modeling/presentation_02_roc_curve.png`
-- 발표용 혼동행렬: `artifacts/modeling/presentation_03_confusion_matrix.png`
-- 발표용 피처 중요도: `artifacts/modeling/presentation_04_feature_importance.png`
-- 발표용 모델 성능 비교: `artifacts/modeling/presentation_05_retention_model_comparison.png`
-
+- 모델 성능 비교: `artifacts/modeling/presentation_00_retention_model_comparison.png`
+- 성능 그래프: `artifacts/modeling/presentation_01_model_performance.png`
+- ROC 곡선: `artifacts/modeling/presentation_02_roc_curve.png`
+- 혼동행렬: `artifacts/modeling/presentation_03_confusion_matrix.png`
+- 피처 중요도: `artifacts/modeling/presentation_04_feature_importance.png`
+- 기준선 비교: `artifacts/modeling/presentation_05_threshold_tradeoff.png`
