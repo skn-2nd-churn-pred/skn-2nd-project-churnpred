@@ -354,85 +354,86 @@ with t2:
 with t3:
     bundle, err = get_bundle()
     if bundle is None:
+        # st.stop()을 쓰면 이 탭뿐 아니라 스크립트 전체(이후 탭 포함)가 멈춘다.
+        # 이 탭만 건너뛰고 다른 탭은 계속 렌더링되도록 if/else로 감싼다.
         st.warning(err)
-        st.stop()
-    df = load_scoring_data()
-    if df is None:
-        st.error("입력폼 기준값을 만들 전처리 데이터(data/interim)가 없습니다.")
-        st.stop()
+    else:
+        df = load_scoring_data()
+        if df is None:
+            st.error("입력폼 기준값을 만들 전처리 데이터(data/interim)가 없습니다.")
+        else:
+            proba_all = score_customers(df)
+            examples = {
+                "예시: 고위험 고객": int(proba_all.idxmax()),
+                "예시: 중위험 고객": int((proba_all - 0.55).abs().idxmin()),
+                "예시: 저위험 고객": int(proba_all.idxmin()),
+                "직접 입력 (전체 중앙값에서 시작)": None,
+            }
+            choice = st.selectbox("예시 고객 선택", list(examples))
+            idx = examples[choice]
+            base = (df.loc[idx] if idx is not None else df.median(numeric_only=True)).copy()
 
-    proba_all = score_customers(df)
-    examples = {
-        "예시: 고위험 고객": int(proba_all.idxmax()),
-        "예시: 중위험 고객": int((proba_all - 0.55).abs().idxmin()),
-        "예시: 저위험 고객": int(proba_all.idxmin()),
-        "직접 입력 (전체 중앙값에서 시작)": None,
-    }
-    choice = st.selectbox("예시 고객 선택", list(examples))
-    idx = examples[choice]
-    base = (df.loc[idx] if idx is not None else df.median(numeric_only=True)).copy()
+            feat_names = bundle["feature_names"]
+            form = {c: base.get(c) for c in feat_names}
 
-    feat_names = bundle["feature_names"]
-    form = {c: base.get(c) for c in feat_names}
+            stats = load_scaler_stats()  # 실제 단위 <-> 표준화 값 변환용
+            edited: dict[str, float] = {}
+            with st.form("predict"):
+                st.markdown("**주요 고객 정보** — 값을 바꾸면 예측 확률이 실제로 바뀝니다.")
+                cols = st.columns(2)
+                for i, (feat, label) in enumerate(KEY_FEATURES.items()):
+                    if feat not in df.columns:
+                        continue
+                    v = base.get(feat)
+                    v = 0.0 if pd.isna(v) else float(v)
+                    if feat in stats:  # 화면에는 실제 단위로 보여준다
+                        m, s = stats[feat]
+                        v = v * s + m
+                    with cols[i % 2]:
+                        edited[feat] = st.number_input(f"{label} ({feat})", value=round(v, 1))
+                c1, c2 = st.columns(2)
+                with c1:
+                    retention = st.selectbox(
+                        "리텐션팀 통화 경험 (MadeCallToRetentionTeam)", ["No", "Yes"],
+                        index=int(base.get("MadeCallToRetentionTeam_Yes", 0) == 1),
+                    )
+                with c2:
+                    current = next(
+                        (c for c in CREDIT_COLS if base.get(c, 0) == 1), CREDIT_COLS[2])
+                    credit = st.selectbox(
+                        "신용 등급 (CreditRating)",
+                        CREDIT_COLS, index=CREDIT_COLS.index(current),
+                        format_func=lambda c: c.split("_", 1)[1],
+                    )
+                go = st.form_submit_button("예측 실행", type="primary")
 
-    stats = load_scaler_stats()  # 실제 단위 <-> 표준화 값 변환용
-    edited: dict[str, float] = {}
-    with st.form("predict"):
-        st.markdown("**주요 고객 정보** — 값을 바꾸면 예측 확률이 실제로 바뀝니다.")
-        cols = st.columns(2)
-        for i, (feat, label) in enumerate(KEY_FEATURES.items()):
-            if feat not in df.columns:
-                continue
-            v = base.get(feat)
-            v = 0.0 if pd.isna(v) else float(v)
-            if feat in stats:  # 화면에는 실제 단위로 보여준다
-                m, s = stats[feat]
-                v = v * s + m
-            with cols[i % 2]:
-                edited[feat] = st.number_input(f"{label} ({feat})", value=round(v, 1))
-        c1, c2 = st.columns(2)
-        with c1:
-            retention = st.selectbox(
-                "리텐션팀 통화 경험 (MadeCallToRetentionTeam)", ["No", "Yes"],
-                index=int(base.get("MadeCallToRetentionTeam_Yes", 0) == 1),
-            )
-        with c2:
-            current = next(
-                (c for c in CREDIT_COLS if base.get(c, 0) == 1), CREDIT_COLS[2])
-            credit = st.selectbox(
-                "신용 등급 (CreditRating)",
-                CREDIT_COLS, index=CREDIT_COLS.index(current),
-                format_func=lambda c: c.split("_", 1)[1],
-            )
-        go = st.form_submit_button("예측 실행", type="primary")
-
-    if go:
-        for feat, v in edited.items():  # 입력받은 실제 단위를 다시 표준화 값으로 변환
-            if feat in stats:
-                m, s = stats[feat]
-                form[feat] = (v - m) / s
-            else:
-                form[feat] = v
-        form["MadeCallToRetentionTeam_Yes"] = float(retention == "Yes")
-        form["MadeCallToRetentionTeam_No"] = float(retention == "No")
-        for c in CREDIT_COLS:
-            form[c] = float(c == credit)
-        try:
-            r = predict_one(form, bundle)
-        except Exception as e:  # 입력값 이상 등
-            st.error(f"예측에 실패했습니다. 입력값을 확인하세요: {e}")
-            st.stop()
-        grade = r["risk_grade"]
-        c1, c2 = st.columns([1, 2])
-        c1.metric("이탈 확률", f"{r['churn_probability']:.1%}")
-        c1.metric("위험 등급", f"{GRADE_ICON[grade]} {grade}")
-        c2.progress(min(float(r["churn_probability"]), 1.0))
-        c2.info(f"제안 유지 활동: {r['suggested_action']}")
-        st.caption(
-            f"임계값 {bundle['threshold']} 기준 예측 = "
-            f"{'이탈' if r['churn_prediction'] else '유지'} · "
-            "입력하지 않은 나머지 특성은 선택한 예시 고객 값을 사용합니다."
-        )
+            if go:
+                for feat, v in edited.items():  # 입력받은 실제 단위를 다시 표준화 값으로 변환
+                    if feat in stats:
+                        m, s = stats[feat]
+                        form[feat] = (v - m) / s
+                    else:
+                        form[feat] = v
+                form["MadeCallToRetentionTeam_Yes"] = float(retention == "Yes")
+                form["MadeCallToRetentionTeam_No"] = float(retention == "No")
+                for c in CREDIT_COLS:
+                    form[c] = float(c == credit)
+                try:
+                    r = predict_one(form, bundle)
+                except Exception as e:  # 입력값 이상 등
+                    st.error(f"예측에 실패했습니다. 입력값을 확인하세요: {e}")
+                else:
+                    grade = r["risk_grade"]
+                    c1, c2 = st.columns([1, 2])
+                    c1.metric("이탈 확률", f"{r['churn_probability']:.1%}")
+                    c1.metric("위험 등급", f"{GRADE_ICON[grade]} {grade}")
+                    c2.progress(min(float(r["churn_probability"]), 1.0))
+                    c2.info(f"제안 유지 활동: {r['suggested_action']}")
+                    st.caption(
+                        f"임계값 {bundle['threshold']} 기준 예측 = "
+                        f"{'이탈' if r['churn_prediction'] else '유지'} · "
+                        "입력하지 않은 나머지 특성은 선택한 예시 고객 값을 사용합니다."
+                    )
 
 # ---------- 화면 4. 신규 고객 세그먼트 분류 ----------
 with t4:
