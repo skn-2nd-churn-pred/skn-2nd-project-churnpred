@@ -1,4 +1,4 @@
-"""Streamlit 시연 (단일 파일, 3개 탭).
+"""Streamlit 시연 (단일 파일, 4개 탭).
 
 실행: streamlit run streamlit_app/app.py
 - 저장된 최종 모델(models/churn_pipeline.joblib)을 불러온다. 앱에서 재학습하지 않는다.
@@ -21,6 +21,78 @@ st.set_page_config(page_title="고객 이탈 예측", page_icon="📉", layout="
 cfg = load_config()
 GRADE_ICON = {"고위험": "🔴", "중위험": "🟡", "저위험": "🟢"}
 MODELING_DIR = ROOT / "artifacts" / "modeling"
+CLUSTER_MODEL_PATH = ROOT / "models" / "kmeans_pipeline.joblib"
+
+CLUSTER_FEATURE_LABELS = {
+    "MonthlyRevenue": "월 평균 요금($)",
+    "MonthlyMinutes": "월 통화량(분)",
+    "OverageMinutes": "초과 사용량(분)",
+    "MonthsInService": "가입 개월 수",
+    "CurrentEquipmentDays": "현재 단말 사용일수",
+    "DroppedBlockedCalls": "끊김·차단 통화 수",
+    "CustomerCareCalls": "고객센터 통화 수",
+    "ActiveSubs": "활성 회선 수",
+}
+
+SEGMENT_GUIDE = {
+    "Loyal Long-term Customers": {
+        "title": "장기 충성 고객",
+        "icon": "🏅",
+        "description": "가입 기간과 단말기 사용 기간이 길고, 사용량과 고객센터 이용은 낮은 안정적인 장기 고객군입니다.",
+        "actions": [
+            "장기 고객 감사 보상 제공",
+            "단말기 교체 할인 또는 업그레이드 혜택 제안",
+            "멤버십 등급 및 장기 혜택 강화",
+            "신규 서비스 체험 프로모션 제공",
+        ],
+    },
+    "Premium Heavy Users": {
+        "title": "프리미엄 헤비 유저",
+        "icon": "💎",
+        "description": "월 매출, 월 사용량, 초과 사용량이 매우 높은 핵심 고객군입니다. 사용 규모가 큰 만큼 품질과 지원 경험이 중요합니다.",
+        "actions": [
+            "VIP 전용 요금제 또는 전담 혜택 제안",
+            "초과 사용량 패키지 제공",
+            "프리미엄 고객 지원 및 우선 응대",
+            "데이터·통화 무제한 상품 전환 제안",
+            "장기 유지 보상 제공",
+        ],
+    },
+    "Multi-line Customers": {
+        "title": "다회선 고객",
+        "icon": "👨‍👩‍👧‍👦",
+        "description": "활성 회선 수가 많지만 회선당 이용량과 매출은 상대적으로 낮은 고객군으로, 가족 또는 복수 회선 고객일 가능성이 높습니다.",
+        "actions": [
+            "가족 결합 할인 제안",
+            "추가 회선 혜택 제공",
+            "회선별 사용 활성화 프로모션",
+            "가족 단위 콘텐츠 및 부가서비스 추천",
+        ],
+    },
+    "Regular Customers": {
+        "title": "일반 고객",
+        "icon": "🙂",
+        "description": "주요 지표가 평균 또는 평균 이하이며 뚜렷한 극단 특성이 없는 일반적인 고객군입니다.",
+        "actions": [
+            "기본 유지 프로그램 적용",
+            "관심 서비스 기반 업셀링",
+            "사용량 증가 이벤트 제공",
+            "개인화된 요금제 추천",
+        ],
+    },
+    "High-Maintenance Customers": {
+        "title": "집중 관리 고객",
+        "icon": "🛠️",
+        "description": "사용량이 높고 끊김·차단 통화와 고객센터 접촉이 매우 많은 고객군으로, 서비스 품질 문제와 지원 수요가 큽니다.",
+        "actions": [
+            "네트워크 및 통화 품질 우선 점검",
+            "전담 상담 또는 우선 응대",
+            "문제 발생 전 선제적 안내",
+            "품질 이슈에 대한 적절한 보상",
+            "반복 문의 원인 분석 및 이탈 방어",
+        ],
+    },
+}
 
 # 현황·예측 탭에서 사람이 해석할 핵심 수치 Feature (interim 컬럼명 그대로)
 KEY_FEATURES = {
@@ -106,6 +178,54 @@ def load_scaler_stats() -> dict[str, tuple[float, float]]:
     return stats
 
 
+
+@st.cache_resource
+def load_cluster_bundle() -> dict:
+    """저장된 K-Means 전처리·모델 번들을 불러온다."""
+    import joblib
+
+    if not CLUSTER_MODEL_PATH.exists():
+        raise FileNotFoundError(
+            f"군집 모델을 찾을 수 없습니다: {CLUSTER_MODEL_PATH}. "
+            "03_cluster 노트북을 실행해 models/kmeans_pipeline.joblib을 생성하세요."
+        )
+    return joblib.load(CLUSTER_MODEL_PATH)
+
+
+def predict_customer_segment(new_customer: pd.DataFrame, bundle: dict) -> pd.DataFrame:
+    """학습 당시와 동일한 전처리를 적용해 신규 고객의 군집을 예측한다."""
+    features = bundle["feature_names"]
+    missing = [feature for feature in features if feature not in new_customer.columns]
+    if missing:
+        raise ValueError(f"필수 컬럼 누락: {missing}")
+
+    transformed = pd.DataFrame(
+        bundle["imputer"].transform(new_customer[features]),
+        columns=features,
+        index=new_customer.index,
+    )
+    transformed = transformed.clip(
+        lower=pd.Series(bundle["lower_bounds"]),
+        upper=pd.Series(bundle["upper_bounds"]),
+        axis=1,
+    )
+    transformed_scaled = bundle["scaler"].transform(transformed)
+    labels = bundle["kmeans"].predict(transformed_scaled)
+
+    output = new_customer.copy()
+    output["Cluster"] = labels
+    output["ClusterName"] = pd.Series(labels, index=output.index).map(bundle["cluster_names"])
+    return output
+
+
+def cluster_default_values(bundle: dict) -> dict[str, float]:
+    """입력 폼 기본값으로 군집 학습 당시 중앙값을 사용한다."""
+    features = bundle["feature_names"]
+    statistics = getattr(bundle["imputer"], "statistics_", None)
+    if statistics is None:
+        return {feature: 0.0 for feature in features}
+    return {feature: float(value) for feature, value in zip(features, statistics)}
+
 def get_bundle():
     try:
         return load_model(), None
@@ -114,7 +234,7 @@ def get_bundle():
 
 
 st.title("📉 고객 이탈 예측")
-t1, t2, t3 = st.tabs(["현황", "모델 성능", "이탈 예측"])
+t1, t2, t3, t4 = st.tabs(["현황", "모델 성능", "이탈 예측", "고객 세그먼트"])
 
 # ---------- 화면 1. 고객 현황 ----------
 with t1:
@@ -313,3 +433,110 @@ with t3:
             f"{'이탈' if r['churn_prediction'] else '유지'} · "
             "입력하지 않은 나머지 특성은 선택한 예시 고객 값을 사용합니다."
         )
+
+# ---------- 화면 4. 신규 고객 세그먼트 분류 ----------
+with t4:
+    st.subheader("🧩 고객 세그먼트 안내")
+
+    st.markdown("### 먼저, 고객은 다음 5가지 세그먼트로 분류됩니다.")
+
+    cols = st.columns(5)
+    for col, key in zip(cols, [
+        "Loyal Long-term Customers",
+        "Premium Heavy Users",
+        "Multi-line Customers",
+        "Regular Customers",
+        "High-Maintenance Customers",
+    ]):
+        guide = SEGMENT_GUIDE[key]
+        with col:
+            st.markdown(f"## {guide['icon']}")
+            st.markdown(f"**{guide['title']}**")
+            st.caption(guide["description"])
+
+    st.divider()
+
+    st.subheader("🧩 신규 고객 세그먼트 분류")
+    st.write(
+        "고객의 이용·계약 정보를 입력하면 저장된 K-Means 모델이 고객군을 분류하고, "
+        "해당 고객군에 적합한 대응 전략을 안내합니다."
+    )
+    st.caption(
+        "군집 번호는 우열이나 위험 순위가 아닙니다. Churn은 군집 학습에 사용되지 않았으며, "
+        "이 화면은 고객 행동 특성에 따른 관리 전략을 제안합니다."
+    )
+
+    try:
+        cluster_bundle = load_cluster_bundle()
+    except (FileNotFoundError, KeyError, ValueError) as e:
+        st.error(str(e))
+    else:
+        features = cluster_bundle["feature_names"]
+        defaults = cluster_default_values(cluster_bundle)
+        entered: dict[str, float] = {}
+
+        with st.form("cluster_predict_form"):
+            st.markdown("**고객 정보 입력**")
+            left, right = st.columns(2)
+            for i, feature in enumerate(features):
+                label = CLUSTER_FEATURE_LABELS.get(feature, feature)
+                default = defaults.get(feature, 0.0)
+                target_col = left if i % 2 == 0 else right
+                with target_col:
+                    entered[feature] = st.number_input(
+                        f"{label} ({feature})",
+                        min_value=0.0,
+                        value=round(float(default), 1),
+                        step=1.0,
+                        help="모델 학습 데이터의 중앙값을 기본값으로 사용합니다.",
+                    )
+            classify = st.form_submit_button("고객군 분류", type="primary", use_container_width=True)
+
+        if classify:
+            new_customer = pd.DataFrame([entered], columns=features)
+            try:
+                result = predict_customer_segment(new_customer, cluster_bundle).iloc[0]
+            except Exception as e:
+                st.error(f"고객군 분류에 실패했습니다. 입력값과 모델 파일을 확인하세요: {e}")
+            else:
+                cluster_no = int(result["Cluster"])
+                segment_name = str(result["ClusterName"])
+                guide = SEGMENT_GUIDE.get(
+                    segment_name,
+                    {
+                        "title": segment_name,
+                        "icon": "👤",
+                        "description": "저장된 군집 프로파일을 확인해 고객 특성을 해석하세요.",
+                        "actions": ["군집 프로파일에 맞는 고객 관리 전략을 수립하세요."],
+                    },
+                )
+
+                st.divider()
+                result_col, detail_col = st.columns([1, 2])
+                with result_col:
+                    st.metric("분류된 Cluster", f"Cluster {cluster_no}")
+                    st.success(f"{guide['icon']} **{guide['title']}**")
+                    st.caption(segment_name)
+
+                with detail_col:
+                    st.markdown("### 고객군 특징")
+                    st.info(guide["description"])
+                    st.markdown("### 추천 고객 대응")
+                    for action in guide["actions"]:
+                        st.markdown(f"- {action}")
+
+                with st.expander("입력한 고객 정보 확인"):
+                    display_input = pd.DataFrame(
+                        {
+                            "항목": [CLUSTER_FEATURE_LABELS.get(f, f) for f in features],
+                            "Feature": features,
+                            "입력값": [entered[f] for f in features],
+                        }
+                    )
+                    st.dataframe(display_input, use_container_width=True, hide_index=True)
+
+                st.warning(
+                    "이 결과는 고객 유형 분류이며 이탈 예측 결과가 아닙니다. "
+                    "실제 유지 캠페인에서는 3번 탭의 이탈 위험도와 함께 활용하세요."
+                )
+
