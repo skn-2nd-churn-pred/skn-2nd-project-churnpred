@@ -9,6 +9,7 @@
 import sys
 from pathlib import Path
 
+import altair as alt
 import pandas as pd
 import streamlit as st
 
@@ -19,6 +20,158 @@ if str(ROOT) not in sys.path:
 from src.predict import load_config, load_model, predict_one, resolve_path  # noqa: E402
 
 st.set_page_config(page_title="고객 이탈 예측", page_icon="📉", layout="wide")
+
+# 공통 화면 스타일: 시스템 한글 폰트를 사용하고 탭·제목·카드 간격을 통일한다.
+st.markdown(
+    """
+    <style>
+    :root {
+        --text-main: #172033;
+        --text-muted: #5f6b7a;
+        --line-soft: #e7ebf0;
+        --surface-soft: #f7f9fc;
+        --accent: #2563eb;
+    }
+
+    html, body, [class*="css"] {
+        font-family: "Pretendard", "Noto Sans KR", "Apple SD Gothic Neo",
+                     "Malgun Gothic", sans-serif;
+        color: var(--text-main);
+    }
+
+    .block-container {
+        max-width: 1440px;
+        padding-top: 2rem;
+        padding-bottom: 3rem;
+    }
+
+    h1, h2, h3 {
+        color: var(--text-main);
+        letter-spacing: -0.035em;
+        line-height: 1.3;
+    }
+
+    h1 {
+        margin-bottom: 1.25rem;
+        font-size: 2.1rem;
+        font-weight: 750;
+    }
+
+    h2, h3 {
+        margin-top: 1.6rem;
+        margin-bottom: 0.8rem;
+        font-weight: 700;
+    }
+
+    p, label, [data-testid="stCaptionContainer"] {
+        letter-spacing: -0.015em;
+        line-height: 1.65;
+    }
+
+    [data-testid="stCaptionContainer"] {
+        color: var(--text-muted);
+    }
+
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 0.5rem;
+        padding: 0.35rem;
+        border-radius: 0.8rem;
+        background: var(--surface-soft);
+        border: 1px solid var(--line-soft);
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        height: 2.9rem;
+        padding: 0 1.35rem;
+        border-radius: 0.6rem;
+        color: var(--text-muted);
+        font-size: 0.98rem;
+        font-weight: 650;
+    }
+
+    .stTabs [aria-selected="true"] {
+        color: var(--accent);
+        background: #ffffff;
+        box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+    }
+
+    .stTabs [data-baseweb="tab-highlight"] {
+        display: none;
+    }
+
+    .stTabs [data-baseweb="tab-panel"] {
+        padding-top: 1.35rem;
+    }
+
+    [data-testid="stMetric"] {
+        padding: 1rem 1.1rem;
+        border: 1px solid var(--line-soft);
+        border-radius: 0.8rem;
+        background: #ffffff;
+    }
+
+    [data-testid="stMetricLabel"] {
+        color: var(--text-muted);
+        font-weight: 600;
+    }
+
+    [data-testid="stMetricValue"] {
+        color: var(--text-main);
+        font-weight: 700;
+    }
+
+    [data-testid="stForm"] {
+        padding: 1.25rem 1.35rem;
+        border-color: var(--line-soft);
+        border-radius: 0.9rem;
+    }
+
+    [data-testid="stFormSubmitButton"] button,
+    .stButton button {
+        min-height: 2.8rem;
+        border-radius: 0.65rem;
+        font-weight: 700;
+        letter-spacing: -0.015em;
+    }
+
+    [data-testid="stNumberInput"] input,
+    [data-baseweb="select"] > div {
+        border-radius: 0.55rem;
+    }
+
+    [data-testid="stAlert"] {
+        border-radius: 0.75rem;
+    }
+
+    [data-testid="stExpander"] {
+        border-color: var(--line-soft);
+        border-radius: 0.75rem;
+    }
+
+    [data-testid="stVerticalBlockBorderWrapper"] {
+        border-color: var(--line-soft);
+        border-radius: 0.9rem;
+    }
+
+    [data-testid="stVerticalBlock"] > [data-testid="stVerticalBlockBorderWrapper"] {
+        margin-bottom: 0.25rem;
+    }
+
+    @media (max-width: 768px) {
+        .block-container {
+            padding-top: 1.25rem;
+        }
+
+        .stTabs [data-baseweb="tab"] {
+            padding: 0 0.75rem;
+            font-size: 0.9rem;
+        }
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 cfg = load_config()
 GRADE_ICON = {"고위험": "🔴", "중위험": "🟡", "저위험": "🟢"}
 MODELING_DIR = ROOT / "artifacts" / "modeling"
@@ -97,6 +250,88 @@ SEGMENT_GUIDE = {
     },
 }
 
+RETENTION_ACTION_GUIDE = {
+    "고위험": [
+        {
+            "label": "1순위 · 24시간 이내",
+            "title": "전담 상담 연결",
+            "description": "요금·통화 품질·단말 문제 중 불편 원인을 먼저 확인하고 상담 이력을 남깁니다.",
+        },
+        {
+            "label": "2순위 · 상담 직후",
+            "title": "맞춤 유지안 제시",
+            "description": "요금제 재설계, 단말 교체 할인, 이탈 방어 쿠폰 중 고객 상황에 맞는 혜택을 제안합니다.",
+        },
+        {
+            "label": "3순위 · 7일 이내",
+            "title": "사후 확인",
+            "description": "혜택 수락 여부와 불편 해소 여부를 확인하고 다음 접촉 필요성을 다시 판단합니다.",
+        },
+    ],
+    "중위험": [
+        {
+            "label": "1순위 · 3일 이내",
+            "title": "만족도 확인",
+            "description": "간단한 설문이나 안내 전화를 통해 최근 사용 경험과 잠재 불편을 확인합니다.",
+        },
+        {
+            "label": "2순위 · 1주 이내",
+            "title": "요금제 적합성 점검",
+            "description": "사용량과 납부 요금의 불균형을 확인해 더 적합한 요금제나 선택 혜택을 안내합니다.",
+        },
+        {
+            "label": "3순위 · 30일 관찰",
+            "title": "행동 변화 모니터링",
+            "description": "통화량 감소와 고객센터 접촉 증가 여부를 확인해 위험 상승 시 우선 대응합니다.",
+        },
+    ],
+    "저위험": [
+        {
+            "label": "정기 관리",
+            "title": "로열티 혜택 안내",
+            "description": "포인트와 장기 이용 혜택을 안내해 현재의 안정적인 이용 관계를 유지합니다.",
+        },
+        {
+            "label": "개인화 안내",
+            "title": "이용 패턴 기반 추천",
+            "description": "과도한 할인보다 실제 이용 패턴에 맞는 부가서비스와 사용 팁을 제공합니다.",
+        },
+        {
+            "label": "분기별 점검",
+            "title": "위험도 재확인",
+            "description": "정기 배치 예측으로 위험 등급 변화를 확인하고 불필요한 고객 접촉은 줄입니다.",
+        },
+    ],
+}
+
+SEGMENT_ACTION_GUIDE = {
+    "Loyal Long-term Customers": [
+        {"label": "관계 강화", "title": "장기 이용 보상", "description": "가입 기간에 맞춘 포인트·멤버십 혜택으로 충성도를 보상합니다."},
+        {"label": "교체 수요", "title": "단말 업그레이드", "description": "오래된 단말 사용 고객에게 교체 할인과 데이터 이전 지원을 제안합니다."},
+        {"label": "경험 확장", "title": "신규 서비스 체험", "description": "신규 부가서비스를 무료 체험하게 해 서비스 활용 범위를 넓힙니다."},
+    ],
+    "Premium Heavy Users": [
+        {"label": "비용 최적화", "title": "대용량 전용 요금제", "description": "초과 사용 비용을 줄일 수 있는 무제한·대용량 상품을 우선 비교합니다."},
+        {"label": "서비스 품질", "title": "우선 고객 지원", "description": "장애와 상담 요청에 빠르게 대응할 수 있는 VIP 지원 채널을 안내합니다."},
+        {"label": "가치 보상", "title": "프리미엄 리워드", "description": "높은 이용 기여도에 맞춰 장기 유지 보상이나 제휴 혜택을 제공합니다."},
+    ],
+    "Multi-line Customers": [
+        {"label": "결합 강화", "title": "가족·다회선 할인", "description": "회선 수에 맞는 결합 할인과 대표 회선 혜택을 재설계합니다."},
+        {"label": "회선 점검", "title": "저활성 회선 관리", "description": "사용량이 낮은 회선을 찾아 요금제 축소나 회선별 맞춤 혜택을 제안합니다."},
+        {"label": "가족 경험", "title": "공유형 부가서비스", "description": "데이터 공유, 가족 콘텐츠 등 여러 회선이 함께 쓰는 서비스를 추천합니다."},
+    ],
+    "Regular Customers": [
+        {"label": "관심 파악", "title": "간단 선호도 확인", "description": "채널·콘텐츠·요금 민감도를 확인해 불필요한 일괄 제안을 줄입니다."},
+        {"label": "맞춤 제안", "title": "요금제 적합성 안내", "description": "현재 사용량과 비용에 맞는 요금제 한두 개를 비교해 안내합니다."},
+        {"label": "참여 유도", "title": "사용 활성화 이벤트", "description": "단기 체험이나 포인트 이벤트로 서비스 이용 경험을 자연스럽게 늘립니다."},
+    ],
+    "High-Maintenance Customers": [
+        {"label": "최우선", "title": "통화 품질 진단", "description": "끊김·차단 통화의 지역과 시간대를 확인하고 네트워크 점검을 요청합니다."},
+        {"label": "문의 관리", "title": "전담 상담 케이스", "description": "반복 문의를 하나의 상담 이력으로 묶어 같은 설명을 반복하지 않게 합니다."},
+        {"label": "사후 조치", "title": "보상 및 재확인", "description": "문제 수준에 맞는 보상 후 해결 여부를 확인해 추가 이탈 신호를 점검합니다."},
+    ],
+}
+
 # 현황·예측 탭에서 사람이 해석할 핵심 수치 Feature (최종 processed 컬럼명 그대로)
 KEY_FEATURES = {
     "MonthlyRevenue": "월 매출($)",
@@ -112,6 +347,16 @@ KEY_FEATURES = {
     "CurrentEquipmentDays": "단말 사용일수",
     "AgeHH1": "가구주 나이",
     "HandsetPrice": "단말 가격($)",
+}
+
+# 최종 HistGradientBoosting 모델의 permutation importance 상위 5개.
+# 3번 탭에서는 이 항목만 직접 변경하게 해 입력 부담을 낮춘다.
+PREDICTION_INPUT_FEATURES = {
+    "CurrentEquipmentDays": "현재 단말기 사용 일수",
+    "MonthsInService": "서비스 이용 개월 수",
+    "MonthlyMinutes": "월 통화 시간",
+    "PercChangeMinutes": "통화 시간 변화",
+    "TotalRecurringCharge": "월 정기 요금($)",
 }
 CREDIT_COLS = [
     "CreditRating_1-Highest", "CreditRating_2-High", "CreditRating_3-Good",
@@ -152,13 +397,23 @@ def load_scoring_data() -> pd.DataFrame | None:
 
 
 @st.cache_data
-def load_validation_data() -> pd.DataFrame | None:
-    """위험도 분포 계산용 validation 데이터.
+def load_test_data() -> pd.DataFrame | None:
+    """위험도 분포 계산용 최종 test 데이터.
 
-    전체(train+val+test)로 위험도를 계산하면 모델이 학습에 쓴 데이터까지
-    채점하게 되어 실제보다 낙관적인 분포가 나온다. 학습에 쓰지 않은
-    validation만 사용해야 현실적인 위험 고객 규모를 보여줄 수 있다.
+    학습과 threshold 결정에 사용하지 않은 test 데이터에만 최종 모델을
+    적용해, 화면의 위험도 구간이 최종 평가 대상 고객 기준이 되게 한다.
     """
+    path = ROOT / "data" / "processed" / "test.csv"
+    if not path.exists():
+        return None
+    df = pd.read_csv(path)
+    df["_churn"] = df["Churn"]
+    return df
+
+
+@st.cache_data
+def load_validation_data() -> pd.DataFrame | None:
+    """모델 성능 지표 계산용 validation 데이터."""
     path = ROOT / "data" / "processed" / "val.csv"
     if not path.exists():
         return None
@@ -275,6 +530,17 @@ def get_bundle():
         return None, str(e)
 
 
+def render_action_cards(actions: list[dict[str, str]]) -> None:
+    """추천 행동을 우선순위·실행 내용이 보이는 카드로 표시한다."""
+    cols = st.columns(len(actions))
+    for col, action in zip(cols, actions):
+        with col:
+            with st.container(border=True):
+                st.caption(action["label"])
+                st.markdown(f"**{action['title']}**")
+                st.write(action["description"])
+
+
 st.title("📉 고객 이탈 예측")
 t1, t2, t3, t4 = st.tabs(["현황", "모델 성능", "이탈 예측", "고객 세그먼트"])
 
@@ -300,7 +566,30 @@ with t1:
         left, right = st.columns(2)
         with left:
             st.subheader("유지 / 이탈 분포")
-            st.bar_chart(y.map({0: "유지", 1: "이탈"}).value_counts())
+            churn_counts = (
+                y.map({0: "유지", 1: "이탈"})
+                .value_counts()
+                .reindex(["유지", "이탈"], fill_value=0)
+                .rename_axis("고객 상태")
+                .reset_index(name="고객 수")
+            )
+            churn_chart = (
+                alt.Chart(churn_counts)
+                .mark_bar()
+                .encode(
+                    x=alt.X("고객 상태:N", sort=["유지", "이탈"], title=None),
+                    y=alt.Y("고객 수:Q", title="고객 수"),
+                    color=alt.Color(
+                        "고객 상태:N",
+                        scale=alt.Scale(domain=["유지", "이탈"], range=["#22A06B", "#E5484D"]),
+                        legend=None,
+                    ),
+                    tooltip=["고객 상태:N", alt.Tooltip("고객 수:Q", format=",")],
+                )
+                .properties(height=300)
+            )
+            # scale binding을 사용하지 않아 마우스 휠 확대·축소가 비활성화된다.
+            st.altair_chart(churn_chart, width="stretch")
         with right:
             st.subheader("특성 구간별 이탈률")
             options = {k: v for k, v in KEY_FEATURES.items()
@@ -309,7 +598,19 @@ with t1:
             binned = pd.qcut(df[sel], q=5, duplicates="drop")
             rate = y.groupby(binned, observed=True).mean()
             rate.index = rate.index.map(lambda iv: f"{iv.left:g}~{iv.right:g}")
-            st.bar_chart(rate)
+            rate_data = rate.rename("이탈률").rename_axis("특성 구간").reset_index()
+            rate_order = rate_data["특성 구간"].tolist()
+            rate_chart = (
+                alt.Chart(rate_data)
+                .mark_bar(color="#4F7CAC")
+                .encode(
+                    x=alt.X("특성 구간:N", sort=rate_order, title=None, axis=alt.Axis(labelAngle=0)),
+                    y=alt.Y("이탈률:Q", title="이탈률", axis=alt.Axis(format=".0%")),
+                    tooltip=["특성 구간:N", alt.Tooltip("이탈률:Q", format=".1%")],
+                )
+                .properties(height=300)
+            )
+            st.altair_chart(rate_chart, width="stretch")
             st.caption("구간은 5분위 기준. 막대가 오른쪽으로 갈수록 값이 큰 고객군.")
 
         st.subheader("핵심 인사이트 (EDA)")
@@ -339,30 +640,51 @@ with t1:
             for filename, caption in figures:
                 path = EDA_IMAGES_DIR / filename
                 if path.exists():
-                    st.image(str(path), use_container_width=True)
+                    st.image(str(path), width="stretch")
                     st.caption(caption)
 
         bundle, err = get_bundle()
         st.subheader("위험도 구간별 고객 수")
-        # 학습에 쓰지 않은 validation 기준으로 계산해야 실제 운영 상황과 가깝다.
-        vdf = load_validation_data()
+        # 최종 평가에만 쓰는 test 데이터 기준으로 위험도 구간을 계산한다.
+        tdf = load_test_data()
         if bundle is None:
             st.warning(err)
-        elif vdf is None:
-            st.warning("검증 데이터(data/processed/val.csv)가 없어 "
+        elif tdf is None:
+            st.warning("테스트 데이터(data/processed/test.csv)가 없어 "
                        "위험도 구간을 계산할 수 없습니다.")
         else:
-            proba = score_customers(vdf)
+            proba = score_customers(tdf)
             grades = pd.cut(proba, bins=[0, 0.4, 0.7, 1.0],
                             labels=["저위험", "중위험", "고위험"], include_lowest=True)
             counts = grades.value_counts().reindex(["고위험", "중위험", "저위험"])
             g1, g2, g3 = st.columns(3)
             for col, grade in zip((g1, g2, g3), counts.index):
                 col.metric(f"{GRADE_ICON[grade]} {grade}", f"{int(counts[grade]):,}명")
-            st.bar_chart(counts)
+            # 카드와 동일한 순서로 행을 만들고 x축 순서를 고정한다.
+            chart_data = pd.DataFrame({
+                "위험도": ["고위험", "중위험", "저위험"],
+                "고객 수": counts.astype(int).tolist(),
+            })
+            # interactive()를 사용하지 않는 정적 차트라 휠 확대/축소가 발생하지 않는다.
+            risk_chart = (
+                alt.Chart(chart_data)
+                .mark_bar(color="#1976D2")
+                .encode(
+                    x=alt.X(
+                        "위험도:N",
+                        sort=["고위험", "중위험", "저위험"],
+                        title=None,
+                        axis=alt.Axis(labelAngle=0),
+                    ),
+                    y=alt.Y("고객 수:Q", title="고객 수"),
+                    tooltip=["위험도:N", alt.Tooltip("고객 수:Q", format=",")],
+                )
+                .properties(height=320)
+            )
+            st.altair_chart(risk_chart, width="stretch")
             st.caption(
-                f"**검증 데이터 {len(vdf):,}명 기준** (학습에 사용하지 않은 데이터라 "
-                "실제 운영 시 분포에 가깝다). "
+                f"**최종 테스트 데이터 {len(tdf):,}명 기준** (학습·모델 선택·threshold "
+                "결정에 사용하지 않은 데이터다). "
                 "등급 구간(0.4·0.7)은 캠페인 우선순위를 나누기 위한 기준이며, "
                 "이탈/유지를 판정하는 예측 임계값과는 별개다."
             )
@@ -384,7 +706,7 @@ with t2:
             show.sort_values(sort_key, ascending=False).reset_index(drop=True)
                 .style.format({c: "{:.4f}" for c in metric_cols})
                 .highlight_max(subset=[sort_key], color="#1a7a3a"),
-            use_container_width=True,
+            width="stretch",
         )
         st.caption(
             f"Retention **제외** feature set 기준 · {sort_key.upper()} 내림차순. "
@@ -423,7 +745,7 @@ with t2:
             [[f"{m['tn']:,} (TN)", f"{m['fp']:,} (FP)"],
              [f"{m['fn']:,} (FN)", f"{m['tp']:,} (TP)"]],
             index=["실제 유지", "실제 이탈"], columns=["예측 유지", "예측 이탈"],
-        ), use_container_width=True)
+        ), width="stretch")
         st.caption(
             f"실제 이탈 {m['fn'] + m['tp']:,}명 중 {m['tp']:,}명 탐지 "
             f"(Recall {m['recall']:.1%}). FP {m['fp']:,}명은 캠페인 비용과 "
@@ -435,7 +757,7 @@ with t2:
                            MODELING_IMAGES_DIR / "presentation_04_feature_importance.png")
                if p.exists()), None)
     if fi:
-        st.image(str(fi), use_container_width=True)
+        st.image(str(fi), width="stretch")
     st.markdown(
         "- 단말 사용일수·가입 개월 수·통화량 증감 등 **이용 행태 변화** 지표가 상위권이다.\n"
         "- 최종 모델은 리텐션 관련 컬럼을 **제외**하고 학습했다 — 접촉 시점을 확인할 수 없어 "
@@ -445,10 +767,20 @@ with t2:
     roc = MODELING_IMAGES_DIR / "presentation_02_roc_curve.png"
     if roc.exists():
         with st.expander("ROC Curve 보기"):
-            st.image(str(roc), use_container_width=True)
+            st.image(str(roc), width="stretch")
 
 # ---------- 화면 3. 개별 고객 이탈 예측 ----------
 with t3:
+    st.subheader("🎯 개별 고객 이탈 예측")
+    st.write(
+        "고객 정보를 입력하면 최종 HistGradientBoosting 모델이 이탈 확률과 "
+        "위험 등급을 계산하고 적합한 유지 활동을 제안합니다."
+    )
+    st.caption(
+        "최종 모델은 Retention 관련 Feature를 제외한 버전이며, "
+        f"이탈 판정 임계값은 {cfg['model']['threshold']}입니다."
+    )
+
     bundle, err = get_bundle()
     if bundle is None:
         # st.stop()을 쓰면 이 탭뿐 아니라 스크립트 전체(이후 탭 포함)가 멈춘다.
@@ -466,7 +798,11 @@ with t3:
                 "예시: 저위험 고객": int(proba_all.idxmin()),
                 "직접 입력 (전체 중앙값에서 시작)": None,
             }
-            choice = st.selectbox("예시 고객 선택", list(examples))
+            choice = st.selectbox(
+                "입력 방식 선택",
+                list(examples),
+                help="예시 고객을 선택한 뒤 주요 값을 바꿔 예측 결과의 변화를 확인할 수 있습니다.",
+            )
             idx = examples[choice]
             base = (df.loc[idx] if idx is not None else df.median(numeric_only=True)).copy()
 
@@ -476,9 +812,11 @@ with t3:
             stats = load_scaler_stats()  # 실제 단위 <-> 표준화 값 변환용
             edited: dict[str, float] = {}
             with st.form("predict"):
-                st.markdown("**주요 고객 정보** — 값을 바꾸면 예측 확률이 실제로 바뀝니다.")
+                st.markdown(
+                    "**예측 영향이 큰 상위 5개 고객 정보** — 값을 바꾸면 예측 확률이 실제로 바뀝니다."
+                )
                 cols = st.columns(2)
-                for i, (feat, label) in enumerate(KEY_FEATURES.items()):
+                for i, (feat, label) in enumerate(PREDICTION_INPUT_FEATURES.items()):
                     if feat not in df.columns:
                         continue
                     v = base.get(feat)
@@ -496,7 +834,9 @@ with t3:
                     CREDIT_COLS, index=CREDIT_COLS.index(current),
                     format_func=lambda c: c.split("_", 1)[1],
                 )
-                go = st.form_submit_button("예측 실행", type="primary")
+                go = st.form_submit_button(
+                    "이탈 위험 예측하기", type="primary", width="stretch"
+                )
 
             if go:
                 for feat, v in edited.items():  # 입력받은 실제 단위를 다시 표준화 값으로 변환
@@ -513,40 +853,64 @@ with t3:
                     st.error(f"예측에 실패했습니다. 입력값을 확인하세요: {e}")
                 else:
                     grade = r["risk_grade"]
-                    c1, c2 = st.columns([1, 2])
-                    c1.metric("이탈 확률", f"{r['churn_probability']:.1%}")
-                    c1.metric("위험 등급", f"{GRADE_ICON[grade]} {grade}")
-                    c2.progress(min(float(r["churn_probability"]), 1.0))
-                    c2.info(f"제안 유지 활동: {r['suggested_action']}")
-                    st.caption(
-                        f"임계값 {bundle['threshold']} 기준 예측 = "
-                        f"{'이탈' if r['churn_prediction'] else '유지'} · "
-                        "입력하지 않은 나머지 특성은 선택한 예시 고객 값을 사용합니다."
-                    )
+                    prediction_label = "이탈 예상" if r["churn_prediction"] else "유지 예상"
+
+                    st.divider()
+                    st.markdown("### 예측 결과")
+                    with st.container(border=True):
+                        c1, c2, c3 = st.columns(3)
+                        c1.metric("이탈 확률", f"{r['churn_probability']:.1%}")
+                        c2.metric("이탈 판정", prediction_label)
+                        c3.metric("위험 등급", f"{GRADE_ICON[grade]} {grade}")
+
+                        st.progress(min(float(r["churn_probability"]), 1.0))
+                        if grade == "고위험":
+                            st.error("즉시 유지 캠페인 검토가 필요한 고위험 고객입니다.")
+                        elif grade == "중위험":
+                            st.warning("행동 변화와 이용 불편 여부를 확인할 중위험 고객입니다.")
+                        else:
+                            st.success("현재 이탈 위험이 낮은 고객입니다. 정기 모니터링을 권장합니다.")
+
+                        st.markdown("#### 추천 유지 활동")
+                        st.info(f"핵심 제안: {r['suggested_action']}")
+                        render_action_cards(RETENTION_ACTION_GUIDE[grade])
+                        st.caption(
+                            f"임계값 {bundle['threshold']} 기준 · "
+                            "입력하지 않은 나머지 Feature는 선택한 예시 고객 값을 사용했습니다. "
+                            "예측 결과는 유지 활동 대상 선정을 돕는 참고 정보입니다."
+                        )
 
 # ---------- 화면 4. 신규 고객 세그먼트 분류 ----------
 with t4:
     st.subheader("🧩 고객 세그먼트 안내")
+    st.write(
+        "고객의 이용 규모와 서비스 행동을 바탕으로 유사한 고객군을 찾고, "
+        "세그먼트별 관리 방향을 제안합니다."
+    )
 
-    st.markdown("### 먼저, 고객은 다음 5가지 세그먼트로 분류됩니다.")
+    st.markdown("### 분류 가능한 고객 유형")
 
-    cols = st.columns(5)
-    for col, key in zip(cols, [
-        "Loyal Long-term Customers",
-        "Premium Heavy Users",
-        "Multi-line Customers",
-        "Regular Customers",
-        "High-Maintenance Customers",
-    ]):
-        guide = SEGMENT_GUIDE[key]
-        with col:
-            st.markdown(f"## {guide['icon']}")
-            st.markdown(f"**{guide['title']}**")
-            st.caption(guide["description"])
+    segment_rows = [
+        [
+            "Loyal Long-term Customers",
+            "Premium Heavy Users",
+            "Multi-line Customers",
+        ],
+        ["Regular Customers", "High-Maintenance Customers"],
+    ]
+    for row_keys in segment_rows:
+        cols = st.columns(len(row_keys))
+        for col, key in zip(cols, row_keys):
+            guide = SEGMENT_GUIDE[key]
+            with col:
+                with st.container(border=True):
+                    st.markdown(f"## {guide['icon']}")
+                    st.markdown(f"**{guide['title']}**")
+                    st.caption(guide["description"])
 
     st.divider()
 
-    st.subheader("🧩 신규 고객 세그먼트 분류")
+    st.subheader("👤 신규 고객 유형 예측")
     st.write(
         "고객의 이용·계약 정보를 입력하면 저장된 K-Means 모델이 고객군을 분류하고, "
         "해당 고객군에 적합한 대응 전략을 안내합니다."
@@ -566,7 +930,8 @@ with t4:
         entered: dict[str, float] = {}
 
         with st.form("cluster_predict_form"):
-            st.markdown("**고객 정보 입력**")
+            st.markdown("**고객 행동 정보 입력**")
+            st.caption("기본값은 모델 학습 데이터의 중앙값이며 실제 단위로 입력합니다.")
             left, right = st.columns(2)
             for i, feature in enumerate(features):
                 label = CLUSTER_FEATURE_LABELS.get(feature, feature)
@@ -580,7 +945,9 @@ with t4:
                         step=1.0,
                         help="모델 학습 데이터의 중앙값을 기본값으로 사용합니다.",
                     )
-            classify = st.form_submit_button("고객군 분류", type="primary", use_container_width=True)
+            classify = st.form_submit_button(
+                "고객 유형 예측하기", type="primary", width="stretch"
+            )
 
         if classify:
             new_customer = pd.DataFrame([entered], columns=features)
@@ -602,18 +969,35 @@ with t4:
                 )
 
                 st.divider()
-                result_col, detail_col = st.columns([1, 2])
-                with result_col:
-                    st.metric("분류된 Cluster", f"Cluster {cluster_no}")
-                    st.success(f"{guide['icon']} **{guide['title']}**")
-                    st.caption(segment_name)
+                st.markdown("### 고객 유형 예측 결과")
+                with st.container(border=True):
+                    result_col, detail_col = st.columns([1, 2])
+                    with result_col:
+                        st.metric("분류된 고객군", f"Cluster {cluster_no}")
+                        st.success(f"{guide['icon']} **{guide['title']}**")
+                        st.caption(f"모델 세그먼트명: {segment_name}")
 
-                with detail_col:
-                    st.markdown("### 고객군 특징")
-                    st.info(guide["description"])
-                    st.markdown("### 추천 고객 대응")
-                    for action in guide["actions"]:
-                        st.markdown(f"- {action}")
+                    with detail_col:
+                        st.markdown("#### 고객군 특징")
+                        st.info(guide["description"])
+
+                    st.markdown("#### 추천 고객 대응")
+                    segment_actions = SEGMENT_ACTION_GUIDE.get(segment_name)
+                    if segment_actions is None:
+                        segment_actions = [
+                            {
+                                "label": f"{index}순위",
+                                "title": action,
+                                "description": "고객 프로파일과 상담 이력을 확인한 뒤 적용합니다.",
+                            }
+                            for index, action in enumerate(guide["actions"][:3], start=1)
+                        ]
+                    render_action_cards(segment_actions)
+
+                    st.caption(
+                        "세그먼트는 고객 특성의 유사성을 나타내며 우열이나 이탈 위험 순위가 아닙니다. "
+                        "실제 유지 활동에서는 3번 탭의 이탈 위험도와 함께 활용하세요."
+                    )
 
                 with st.expander("입력한 고객 정보 확인"):
                     display_input = pd.DataFrame(
@@ -623,7 +1007,7 @@ with t4:
                             "입력값": [entered[f] for f in features],
                         }
                     )
-                    st.dataframe(display_input, use_container_width=True, hide_index=True)
+                    st.dataframe(display_input, width="stretch", hide_index=True)
 
                 st.warning(
                     "이 결과는 고객 유형 분류이며 이탈 예측 결과가 아닙니다. "
