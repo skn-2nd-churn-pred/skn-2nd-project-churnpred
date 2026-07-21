@@ -25,9 +25,9 @@ streamlit run streamlit_app/app.py
 
 | 담당 | 노트북 | 산출물 |
 | --- | --- | --- |
-| A. 전처리·EDA | `notebooks/01_eda.ipynb` | `reports/report.md` A파트 + **`src/clean.py` 정제 규칙 확정** |
-| B. 모델링 | `notebooks/02_model.ipynb` | B파트 + `models/churn_pipeline.joblib` + `artifacts/metrics.csv` |
-| C. 세그먼트(보조) | `notebooks/03_cluster.ipynb` | C파트 (Must 완료 후 착수, 예측 로직 미포함) |
+| A. 전처리·EDA | `notebooks/01_eda.ipynb`, `00_data_check.ipynb` | `reports/preprocessing_report.md` + **`src/clean.py`/`src/data.py` 정제 규칙 확정** |
+| B. 모델링 | `notebooks/02_model.ipynb` | `reports/modeling_report.md` + `models/*_final.joblib` |
+| C. 세그먼트(보조) | `notebooks/03_cluster.ipynb` | `reports/clustering_report.md` (Must 완료 후 착수, 예측 로직 미포함) |
 
 ## 골격이 잡아주는 것 (직접 짜면 틀리기 쉬운 부분)
 
@@ -56,14 +56,14 @@ src/predict.py          # 설정 로드 + 추론 (앱·노트북 공유)
 notebooks/01_eda 02_model 03_cluster    # ★ 실제 작업 (담당자별)
 streamlit_app/app.py    # 3탭 시연
 docs/                   # team_plan · project_plan · pipeline.png · handoff.png
-reports/report.md       # 결과서 (A/B/C파트)
+reports/                # preprocessing_report.md · modeling_report.md · clustering_report.md
 data/raw  models  artifacts             # 원본(Git 제외) · 모델 · 지표
 ```
 
 | 필수 산출물 | 위치 |
 | --- | --- |
-| 전처리·학습·세그먼트 결과서 | `reports/report.md` (A/B/C파트) |
-| 최종 모델 | `models/churn_pipeline.joblib` (노트북 02에서 저장) |
+| 전처리·학습·세그먼트 결과서 | `reports/preprocessing_report.md`, `modeling_report.md`, `clustering_report.md` |
+| 최종 모델 | `models/histgradientboosting_without_retention_final.joblib` (노트북 02에서 저장, 리텐션 컬럼 제외 버전으로 팀 확정) |
 | Streamlit 시연 | `streamlit_app/app.py` |
 | 발표자료 | `presentation.pdf` |
 

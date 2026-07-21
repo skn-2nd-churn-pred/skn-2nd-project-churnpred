@@ -27,11 +27,11 @@
 | 역할 | 담당 | 주요 책임 |
 | --- | --- | --- |
 | **A. PM / 요구사항·문서** | 팀원 1 | 범위·일정 관리, `docs/project_plan.md` 완성, README·발표자료 통합, 산출물 최종 점검 |
-| **B. 데이터 / 전처리** | 팀원 2 | Data Card 작성, 품질 점검(결측·이상값), 전처리 Pipeline 설계, `reports/report.md` A파트 |
+| **B. 데이터 / 전처리** | 팀원 2 | Data Card 작성, 품질 점검(결측·이상값), 전처리 Pipeline 설계, `reports/preprocessing_report.md` |
 | **C. EDA / Feature** | 팀원 3 | 노트북 01 (시각화 5~7개 + 인사이트 3개), Feature 결정 근거, 누수 의심 컬럼 판정 |
-| **D. 모델링 / 평가** | 팀원 4 | 노트북 02 (분리→비교→선정→Test→저장), 임계값 결정, `reports/report.md` B파트 |
-| **Streamlit / 통합** | A 주도 + D 지원 | 3탭 앱 연결, 저장 모델 호출 검증, 시연 리허설 |
-| **군집분석 (보조, Could)** | C | 노트북 03 (`03_cluster.ipynb`), `reports/report.md` C파트. **Must 완료 후 착수** |
+| **D. 모델링 / 평가** | 팀원 4 | 노트북 02 (분리→비교→선정→Test→저장), 임계값 결정, `reports/modeling_report.md` |
+| **Streamlit / 통합** | A 주도 + D 지원 | 4탭 앱 연결, 저장 모델 호출 검증, 시연 리허설 |
+| **군집분석 (보조, Could)** | C | 노트북 03 (`03_cluster.ipynb`), `reports/clustering_report.md`. **Must 완료 후 착수** |
 
 ### 상호 검토(리뷰) 짝
 | 작업 | 담당자 | 검토자 |
@@ -67,7 +67,7 @@
 | **7/17 (금)** | 전처리 Pipeline 확정 + 노트북 02 전반: 3분할, Dummy~RF 기준 모델 | 분할 코드, 기준 성능표 | B·D |
 | **7/18 (토)** | 부스팅 추가, 리텐션 컬럼 포함/제외 비교, 최종 모델 선정 + 임계값(Validation) | 모델 비교표, 선정 근거 | D (검토 C) |
 | **7/19 (일)** | **최종 Test 1회** → 모델 저장(`joblib`) → Streamlit 연결 확인. **(C, 시간 되면) 노트북 03 군집분석 착수** | `churn_pipeline.joblib`, metrics.csv | D → A / C |
-| **7/20 (월)** | 통합일: 전체 실행 리허설(클론→설치→실행), 결과서 A·B파트 완성. 군집분석은 **완료 시에만** C파트 채움 | `reports/report.md` 완성 | 전원 |
+| **7/20 (월)** | 통합일: 전체 실행 리허설(클론→설치→실행), 결과서 완성. 군집분석은 **완료 시에만** 반영 | `reports/preprocessing_report.md`·`modeling_report.md` 완성 | 전원 |
 | **7/21 (화)** | 발표자료 작성, README 수치 일치 확인, 시연 리허설 2회 | `presentation.pdf` | A (전원 리뷰) |
 | **7/22 (수)** | **발표** | — | 전원 |
 
@@ -76,7 +76,7 @@
 ## 4. Git 운영 규칙
 
 - `main` 직접 작업 금지 → `feature/eda`, `feature/preprocess`, `feature/model`, `feature/streamlit`, `feature/cluster`
-- `reports/report.md`는 **자기 섹션(A/B/C파트)만 수정**하고 통합일(7/20)에 A가 취합 — 머지 충돌 방지
+- 결과서는 **담당자별 파일 분리**(`preprocessing_report.md`/`modeling_report.md`/`clustering_report.md`)로 관리 — 같은 파일을 여러 명이 동시에 채우지 않도록 머지 충돌 방지
 - 정제 규칙은 **`src/clean.py`로만 공유** (A가 작성·수정, B·C는 import만 — 노트북에 복붙 금지)
 - 하루 1회 이상 main에 통합하고 **전체 실행 확인** (7/20은 필수 통합일)
 - 커밋 금지: `data/raw/*.csv`(대용량 원본), `.env`, 가상환경 — `.gitignore`가 이미 차단

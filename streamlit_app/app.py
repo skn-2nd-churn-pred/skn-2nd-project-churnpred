@@ -2,7 +2,7 @@
 
 실행: streamlit run streamlit_app/app.py
 - 저장된 최종 모델(config.yaml의 model.path)을 불러온다. 앱에서 재학습하지 않는다.
-  최종 모델은 리텐션 컬럼을 제외한 버전이다 (reports/report.md A-3 팀 결정).
+  최종 모델은 리텐션 컬럼을 제외한 버전이다 (reports/modeling_report.md 5절 팀 결정).
 - 입력을 바꾸면 확률도 실제로 바뀐다.
 - 원본 CSV가 없으면 data/interim의 전처리 데이터(train+val+test)로 대체한다.
 """
