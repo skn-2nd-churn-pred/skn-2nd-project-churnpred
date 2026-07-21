@@ -150,6 +150,22 @@ def load_scoring_data() -> pd.DataFrame | None:
 
 
 @st.cache_data
+def load_validation_data() -> pd.DataFrame | None:
+    """위험도 분포 계산용 validation 데이터.
+
+    전체(train+val+test)로 위험도를 계산하면 모델이 학습에 쓴 데이터까지
+    채점하게 되어 실제보다 낙관적인 분포가 나온다. 학습에 쓰지 않은
+    validation만 사용해야 현실적인 위험 고객 규모를 보여줄 수 있다.
+    """
+    path = ROOT / "data" / "interim" / "val_with_retention.csv"
+    if not path.exists():
+        return None
+    df = pd.read_csv(path)
+    df["_churn"] = df["Churn"]
+    return df
+
+
+@st.cache_data
 def score_customers(df: pd.DataFrame) -> pd.Series:
     """전체 고객의 이탈 확률 (위험도 구간·예시 고객 선택에 사용)."""
     bundle = load_model()
@@ -249,6 +265,12 @@ with t1:
         c3.metric("유지 고객", f"{int((1 - y).sum()):,}명")
         c4.metric("이탈률", f"{y.mean():.1%}")
 
+        st.caption(
+            "전체 고객 대비 이탈률 28.8%. 통신업계 연간 이탈률이 통상 20~30% 수준인 점을 "
+            "감안하면 극단적 불균형은 아니지만, 이탈 고객이 소수 클래스이므로 "
+            "Accuracy 대신 Recall·PR-AUC를 우선 지표로 사용한다."
+        )
+
         left, right = st.columns(2)
         with left:
             st.subheader("유지 / 이탈 분포")
@@ -267,21 +289,44 @@ with t1:
         st.subheader("핵심 인사이트 (EDA)")
         st.markdown(
             "- **단말 사용일수(CurrentEquipmentDays)가 길수록 이탈률 상승** — "
-            "오래된 단말을 쓰는 고객은 교체 시점에 타사로 이동할 위험이 크다.\n"
-            "- **가입 초기(MonthsInService 낮음) 고객의 이탈률이 높음** — 온보딩 구간 관리가 필요하다.\n"
+            "6개월 미만 22.9% → 2년 이상 36.1%. 오래된 단말을 쓰는 고객은 "
+            "교체 시점에 타사로 이동할 위험이 크다.\n"
+            "- **구형(웹 미지원) 단말 고객의 이탈률(37.4%)이 웹 지원 단말(27.9%)보다 높음** — "
+            "단말 노후도를 기준으로 업그레이드 프로모션 대상을 선정할 근거가 된다.\n"
             "- **리텐션팀 통화 경험 고객의 이탈률(45.0%)이 미경험(28.2%)보다 높음** — "
-            "이미 이탈 의사를 보인 신호이므로 모델은 retention 포함/제외 두 버전으로 비교해 확정했다."
+            "이미 이탈 의사를 보인 고객을 리텐션팀이 먼저 접촉한 역인과관계로 보인다. "
+            "포함/제외 두 버전을 비교한 결과 성능 차이가 미미해(ROC-AUC +0.005) "
+            "**리텐션 컬럼을 제외한 모델을 최종 채택**했다."
         )
+
+        with st.expander("📊 EDA 상세 차트 보기"):
+            figures = [
+                ("02_equipmentdays_by_churn.png",
+                 "단말 사용일수 분포 — 이탈 고객이 오래된 단말 쪽에 치우쳐 있다."),
+                ("05_creditrating_churn_rate.png",
+                 "신용등급별 이탈률 — 등급이 높을수록 이탈이 낮을 것이라는 기대와 달리, "
+                 "1-Highest(30.8%)가 5-Low(22.1%)보다 오히려 높다. "
+                 "트리 계열 모델이 이런 비선형 관계를 잡아내는 것이 중요한 이유다."),
+                ("06_region_churn_rate.png",
+                 "지역(대도시권)별 이탈률 편차 — 전국 단일 캠페인보다 지역별 강도 조절이 유리하다."),
+            ]
+            for filename, caption in figures:
+                path = ROOT / "reports" / "figures" / filename
+                if path.exists():
+                    st.image(str(path), use_container_width=True)
+                    st.caption(caption)
 
         bundle, err = get_bundle()
         st.subheader("위험도 구간별 고객 수")
-        sdf = load_scoring_data()
+        # 학습에 쓰지 않은 validation 기준으로 계산해야 실제 운영 상황과 가깝다.
+        vdf = load_validation_data()
         if bundle is None:
             st.warning(err)
-        elif sdf is None:
-            st.warning("전처리 데이터(data/interim)가 없어 위험도 구간을 계산할 수 없습니다.")
+        elif vdf is None:
+            st.warning("검증 데이터(data/interim/val_with_retention.csv)가 없어 "
+                       "위험도 구간을 계산할 수 없습니다.")
         else:
-            proba = score_customers(sdf)
+            proba = score_customers(vdf)
             grades = pd.cut(proba, bins=[0, 0.4, 0.7, 1.0],
                             labels=["저위험", "중위험", "고위험"], include_lowest=True)
             counts = grades.value_counts().reindex(["고위험", "중위험", "저위험"])
@@ -289,6 +334,12 @@ with t1:
             for col, grade in zip((g1, g2, g3), counts.index):
                 col.metric(f"{GRADE_ICON[grade]} {grade}", f"{int(counts[grade]):,}명")
             st.bar_chart(counts)
+            st.caption(
+                f"**검증 데이터 {len(vdf):,}명 기준** (학습에 사용하지 않은 데이터라 "
+                "실제 운영 시 분포에 가깝다). "
+                "등급 구간(0.4·0.7)은 캠페인 우선순위를 나누기 위한 기준이며, "
+                "이탈/유지를 판정하는 예측 임계값과는 별개다."
+            )
 
 # ---------- 화면 2. 모델 성능 ----------
 with t2:
