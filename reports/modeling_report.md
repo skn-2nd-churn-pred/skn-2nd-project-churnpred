@@ -140,10 +140,10 @@ Retention 제외 버전에서 **HistGradientBoosting**은 비교 모델 중 PR-A
 
 - 최종 모델: `models/histgradientboosting_without_retention_final.joblib`
 - 상세 리포트: `reports/modeling_report.md`
-- 모델 성능 비교: `artifacts/modeling/presentation_00_retention_model_comparison.png`
-- 성능 그래프: `artifacts/modeling/presentation_01_model_performance.png`
-- ROC 곡선: `artifacts/modeling/presentation_02_roc_curve.png`
-- PR 곡선(PR-AUC): `artifacts/modeling/presentation_03_pr_curve.png`
-- 혼동행렬: `artifacts/modeling/presentation_04_confusion_matrix.png`
-- 최종 모델 피처 중요도: `artifacts/modeling/presentation_05_feature_importance.png`
-- 최종 모델 기준선 비교: `artifacts/modeling/presentation_06_threshold_tradeoff.png`
+- 모델 성능 비교: `assets/images/modeling/presentation_00_retention_model_comparison.png`
+- 성능 그래프: `assets/images/modeling/presentation_01_model_performance.png`
+- ROC 곡선: `assets/images/modeling/presentation_02_roc_curve.png`
+- PR 곡선(PR-AUC): `assets/images/modeling/presentation_03_pr_curve.png`
+- 혼동행렬: `assets/images/modeling/presentation_04_confusion_matrix.png`
+- 최종 모델 피처 중요도: `assets/images/modeling/presentation_05_feature_importance.png`
+- 최종 모델 기준선 비교: `assets/images/modeling/presentation_06_threshold_tradeoff.png`

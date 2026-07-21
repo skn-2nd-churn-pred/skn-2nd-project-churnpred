@@ -22,6 +22,8 @@ st.set_page_config(page_title="고객 이탈 예측", page_icon="📉", layout="
 cfg = load_config()
 GRADE_ICON = {"고위험": "🔴", "중위험": "🟡", "저위험": "🟢"}
 MODELING_DIR = ROOT / "artifacts" / "modeling"
+EDA_IMAGES_DIR = ROOT / "assets" / "images" / "eda"
+MODELING_IMAGES_DIR = ROOT / "assets" / "images" / "modeling"
 CLUSTER_MODEL_PATH = ROOT / "models" / "kmeans_pipeline.joblib"
 
 CLUSTER_FEATURE_LABELS = {
@@ -335,7 +337,7 @@ with t1:
                  "지역(대도시권)별 이탈률 편차 — 전국 단일 캠페인보다 지역별 강도 조절이 유리하다."),
             ]
             for filename, caption in figures:
-                path = ROOT / "reports" / "figures" / filename
+                path = EDA_IMAGES_DIR / filename
                 if path.exists():
                     st.image(str(path), use_container_width=True)
                     st.caption(caption)
@@ -429,8 +431,8 @@ with t2:
         )
 
     st.subheader("중요 Feature와 해석")
-    fi = next((p for p in (MODELING_DIR / "presentation_05_feature_importance.png",
-                           MODELING_DIR / "presentation_04_feature_importance.png")
+    fi = next((p for p in (MODELING_IMAGES_DIR / "presentation_05_feature_importance.png",
+                           MODELING_IMAGES_DIR / "presentation_04_feature_importance.png")
                if p.exists()), None)
     if fi:
         st.image(str(fi), use_container_width=True)
@@ -440,7 +442,7 @@ with t2:
         "누수 여부를 검증할 방법이 없기 때문이다 (report.md A-3).\n"
         "- 중요도는 예측 기여도이며 인과관계로 해석하지 않는다."
     )
-    roc = MODELING_DIR / "presentation_02_roc_curve.png"
+    roc = MODELING_IMAGES_DIR / "presentation_02_roc_curve.png"
     if roc.exists():
         with st.expander("ROC Curve 보기"):
             st.image(str(roc), use_container_width=True)

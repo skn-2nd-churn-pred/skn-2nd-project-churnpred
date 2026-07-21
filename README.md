@@ -4,7 +4,7 @@
 > 고객 요금·통화·단말 데이터로 **이탈 여부(Churn, Yes=1)** 를 예측하고 유지 활동을 제안한다.
 
 - 데이터: [Cell2Cell (Kaggle)](https://www.kaggle.com/datasets/jpacse/datasets-for-churn-telecom) — 고객 51,047명 × 58컬럼, 이탈률 28.8%
-- 작업 흐름: [docs/pipeline.png](docs/pipeline.png) · 팀 간 공유 시점: [docs/handoff.png](docs/handoff.png) · 상세 계획: [docs/team_plan.md](docs/team_plan.md)
+- 작업 흐름: [pipeline](assets/images/docs/pipeline.png) · 팀 간 공유 시점: [handoff](assets/images/docs/handoff.png) · 상세 계획: [docs/team_plan.md](docs/team_plan.md)
 
 ## 시작하기
 
@@ -59,7 +59,8 @@ src/
   save_metadata.py           # 모델 메타데이터 생성
 notebooks/                   # 00_data_check · 01_eda · 02_model · 03_cluster
 streamlit_app/app.py         # 4탭 시연 (현황·모델성능·이탈예측·고객세그먼트)
-docs/                        # team_plan · project_plan · pipeline.png · handoff.png
+assets/images/               # docs · eda · modeling 시각화 파일
+docs/                        # team_plan · project_plan
 reports/                     # preprocessing · modeling · clustering · test_report.md
 tests/test_inference.py      # 모델 로드·신규 고객 예측 검증
 data/  models/  artifacts/   # 원본·중간 데이터(Git 제외) · 모델 · 지표
