@@ -1,7 +1,7 @@
 # 팀 작업 계획서 — Cell2Cell 고객 이탈 예측 (4인)
 
 > 발표: 2026-07-22 (화) · 작성: 2026-07-15
-> 데이터: `cell2celltrain.csv` (51,047명, Target `Churn` 포함) / `cell2cellholdout.csv` (20,000명, **라벨 없음 → 시연용만**)
+> 데이터: `cell2celltrain.csv` (51,047명, Target `Churn` 포함)
 
 ## 0. 프로젝트 한 문장
 
@@ -14,7 +14,7 @@
 - 스냅샷 데이터(1고객 1행)이므로 분리는 `stratify=y` 3분할
 
 ### 기능 범위 (가이드 Must/Should/Could)
-- **Must**: 이탈 예측(B/D), Streamlit 3탭
+- **Must**: 이탈 예측(B/D), Streamlit 4탭
 - **Should**: 임계값 조정, 리텐션 컬럼 포함/제외 근거
 - **Could**: **고객 세그먼트 군집분석** — 이탈 예측과 **독립된 보조 분석**. Must 항목이 끝난 뒤 진행하며, 일정이 밀리면 가장 먼저 축소 대상
 
@@ -53,8 +53,7 @@
 | 3 | `ServiceArea` (고유값 747) | 원-핫 불가 → 앞 3자리(지역) 추출 또는 빈도 상위 N + Other 그룹화 | B |
 | 4 | 결측치 | 수치형 0.3~1.8% → median, `AgeHH1/2` 1.8% → median 또는 "미상" 플래그 | B |
 | 5 | `HandsetPrice` | 문자형에 'Unknown' 포함 → 숫자 변환 + Unknown 처리 확인 | B |
-| 6 | holdout 파일 | **Test set 금지**(라벨 전부 결측). Train/Val/Test는 train CSV에서 3분할. holdout은 Streamlit "신규 고객 일괄 예측" 시연용만 | D |
-| 7 | 클래스 비율 | 29% — SMOTE 없이 `class_weight='balanced'` 우선, 필요 시에만 추가 실험 | D |
+| 6 | 클래스 비율 | 29% — SMOTE 없이 `class_weight='balanced'` 우선, 필요 시에만 추가 실험 | D |
 
 ---
 
@@ -88,6 +87,6 @@
 - [ ] `streamlit run streamlit_app/app.py` 실행, 입력 바꾸면 확률이 실제로 변함
 - [ ] Test는 최종 1회만 평가했고, 임계값은 Validation에서 결정함
 - [ ] 리텐션 컬럼 포함/제외 실험 결과와 결정 근거가 결과서에 있음
-- [ ] holdout을 Test로 쓰지 않았음 (시연용으로만 사용)
+- [ ] Train/Validation/Test를 `cell2celltrain.csv`에서 분리하고 각 역할을 지켰음
 - [ ] README 2~3개 명령으로 설치→실행 재현 가능
 - [ ] (선택) 군집분석을 했다면 Target을 학습에 쓰지 않았고, 군집별 이탈률로 사후 검증했음

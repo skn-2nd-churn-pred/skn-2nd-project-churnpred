@@ -7,14 +7,13 @@
   "id_columns": [
     "CustomerID"
   ],
-  "retention_columns_leakage_note": "MadeCallToRetentionTeam=Yes 고객의 이탈률(45.0%)이 No 고객(28.2%)보다 훨씬 높음 -> 리텐션팀이 이탈 위험 신호를 보고 먼저 연락했을 가능성 (순환 논리). with_retention / without_retention 두 버전을 모두 저장했으니 모델링 단계에서 성능·해석 두 측면을 비교해서 최종 채택 여부를 결정할 것.",
+  "retention_columns_leakage_note": "MadeCallToRetentionTeam=Yes 고객의 이탈률(45.0%)이 No 고객(28.2%)보다 훨씬 높음 -> 리텐션팀이 이탈 위험 신호를 보고 먼저 연락했을 가능성 (순환 논리). with_retention / without_retention 두 버전을 비교했으며, 예측 시점의 불확실성과 성능 과대평가 위험을 고려해 without_retention을 최종 채택함.",
   "service_area_note": "ServiceArea 원본 747개 고유값 -> 앞 3자리 대도시권 코드로 축약 후 Train 기준 50건 미만 지역은 'Other'로 그룹화",
   "zero_fill_columns": [
     "AgeHH1",
     "AgeHH2"
   ],
   "zero_fill_note": "AgeHH1/AgeHH2는 0이 '해당 세대원 없음'의 기존 센티널 값이라 결측치도 중앙값 대신 0으로 채움 (기존 인코딩 관례와 일관성 유지)",
-  "holdout_note": "cell2cellholdout.csv는 Target이 전부 결측이라 Test로 사용하지 않았음. Streamlit '신규 고객 일괄 예측' 시연에만 사용할 것.",
   "class_imbalance_note": "이탈률 약 28.8%. 전처리 단계에서 SMOTE를 적용하지 않았고, 모델링 단계에서 class_weight='balanced'를 우선 적용하기로 함.",
   "split": {
     "train_rows": 30627,

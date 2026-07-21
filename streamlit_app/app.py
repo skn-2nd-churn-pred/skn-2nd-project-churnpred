@@ -157,6 +157,41 @@ st.markdown(
         margin-bottom: 0.25rem;
     }
 
+    .model-performance-table table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        overflow: hidden;
+        border: 1px solid var(--line-soft);
+        border-radius: 0.8rem;
+        font-size: 1.05rem;
+    }
+
+    .model-performance-table th {
+        padding: 0.85rem 0.9rem;
+        background: #eef3f9;
+        color: var(--text-main);
+        font-size: 1.02rem;
+        font-weight: 750;
+        text-align: center;
+        border-bottom: 1px solid var(--line-soft);
+    }
+
+    .model-performance-table td {
+        padding: 0.78rem 0.9rem;
+        text-align: center;
+        border-bottom: 1px solid var(--line-soft);
+    }
+
+    .model-performance-table td:first-child,
+    .model-performance-table th:first-child {
+        text-align: left;
+    }
+
+    .model-performance-table tr:last-child td {
+        border-bottom: 0;
+    }
+
     @media (max-width: 768px) {
         .block-container {
             padding-top: 1.25rem;
@@ -563,55 +598,53 @@ with t1:
             "Accuracy 대신 Recall·PR-AUC를 우선 지표로 사용한다."
         )
 
-        left, right = st.columns(2)
-        with left:
-            st.subheader("유지 / 이탈 분포")
-            churn_counts = (
-                y.map({0: "유지", 1: "이탈"})
-                .value_counts()
-                .reindex(["유지", "이탈"], fill_value=0)
-                .rename_axis("고객 상태")
-                .reset_index(name="고객 수")
+        st.subheader("유지 / 이탈 분포")
+        churn_counts = (
+            y.map({0: "유지", 1: "이탈"})
+            .value_counts()
+            .reindex(["유지", "이탈"], fill_value=0)
+            .rename_axis("고객 상태")
+            .reset_index(name="고객 수")
+        )
+        churn_chart = (
+            alt.Chart(churn_counts)
+            .mark_bar()
+            .encode(
+                x=alt.X("고객 상태:N", sort=["유지", "이탈"], title=None),
+                y=alt.Y("고객 수:Q", title="고객 수"),
+                color=alt.Color(
+                    "고객 상태:N",
+                    scale=alt.Scale(domain=["유지", "이탈"], range=["#22A06B", "#E5484D"]),
+                    legend=None,
+                ),
+                tooltip=["고객 상태:N", alt.Tooltip("고객 수:Q", format=",")],
             )
-            churn_chart = (
-                alt.Chart(churn_counts)
-                .mark_bar()
-                .encode(
-                    x=alt.X("고객 상태:N", sort=["유지", "이탈"], title=None),
-                    y=alt.Y("고객 수:Q", title="고객 수"),
-                    color=alt.Color(
-                        "고객 상태:N",
-                        scale=alt.Scale(domain=["유지", "이탈"], range=["#22A06B", "#E5484D"]),
-                        legend=None,
-                    ),
-                    tooltip=["고객 상태:N", alt.Tooltip("고객 수:Q", format=",")],
-                )
-                .properties(height=300)
+            .properties(height=300)
+        )
+        # scale binding을 사용하지 않아 마우스 휠 확대·축소가 비활성화된다.
+        st.altair_chart(churn_chart, width="stretch")
+
+        st.subheader("특성 구간별 이탈률")
+        options = {k: v for k, v in KEY_FEATURES.items()
+                   if k in df.columns and pd.api.types.is_numeric_dtype(df[k])}
+        sel = st.selectbox("Feature 선택", list(options), format_func=options.get)
+        binned = pd.qcut(df[sel], q=5, duplicates="drop")
+        rate = y.groupby(binned, observed=True).mean()
+        rate.index = rate.index.map(lambda iv: f"{iv.left:g}~{iv.right:g}")
+        rate_data = rate.rename("이탈률").rename_axis("특성 구간").reset_index()
+        rate_order = rate_data["특성 구간"].tolist()
+        rate_chart = (
+            alt.Chart(rate_data)
+            .mark_bar(color="#4F7CAC")
+            .encode(
+                x=alt.X("특성 구간:N", sort=rate_order, title=None, axis=alt.Axis(labelAngle=0)),
+                y=alt.Y("이탈률:Q", title="이탈률", axis=alt.Axis(format=".0%")),
+                tooltip=["특성 구간:N", alt.Tooltip("이탈률:Q", format=".1%")],
             )
-            # scale binding을 사용하지 않아 마우스 휠 확대·축소가 비활성화된다.
-            st.altair_chart(churn_chart, width="stretch")
-        with right:
-            st.subheader("특성 구간별 이탈률")
-            options = {k: v for k, v in KEY_FEATURES.items()
-                       if k in df.columns and pd.api.types.is_numeric_dtype(df[k])}
-            sel = st.selectbox("Feature 선택", list(options), format_func=options.get)
-            binned = pd.qcut(df[sel], q=5, duplicates="drop")
-            rate = y.groupby(binned, observed=True).mean()
-            rate.index = rate.index.map(lambda iv: f"{iv.left:g}~{iv.right:g}")
-            rate_data = rate.rename("이탈률").rename_axis("특성 구간").reset_index()
-            rate_order = rate_data["특성 구간"].tolist()
-            rate_chart = (
-                alt.Chart(rate_data)
-                .mark_bar(color="#4F7CAC")
-                .encode(
-                    x=alt.X("특성 구간:N", sort=rate_order, title=None, axis=alt.Axis(labelAngle=0)),
-                    y=alt.Y("이탈률:Q", title="이탈률", axis=alt.Axis(format=".0%")),
-                    tooltip=["특성 구간:N", alt.Tooltip("이탈률:Q", format=".1%")],
-                )
-                .properties(height=300)
-            )
-            st.altair_chart(rate_chart, width="stretch")
-            st.caption("구간은 5분위 기준. 막대가 오른쪽으로 갈수록 값이 큰 고객군.")
+            .properties(height=300)
+        )
+        st.altair_chart(rate_chart, width="stretch")
+        st.caption("구간은 5분위 기준. 막대가 오른쪽으로 갈수록 값이 큰 고객군.")
 
         st.subheader("핵심 인사이트 (EDA)")
         st.markdown(
@@ -645,6 +678,12 @@ with t1:
 
         bundle, err = get_bundle()
         st.subheader("위험도 구간별 고객 수")
+        st.info(
+            "예측 확률은 0에서 1 사이의 연속값이므로 그대로는 캠페인 우선순위를 정하기 어렵습니다. "
+            "운영 대상을 저위험(0.4 미만)·중위험(0.4 이상 0.7 미만)·고위험(0.7 이상) 세 구간으로 나눠 "
+            "정기 관리·선제 점검·즉시 방어 활동에 연결했습니다. 이 구간은 이탈 판정 "
+            "임계값 0.5와는 별개의 캠페인 관리 기준입니다."
+        )
         # 최종 평가에만 쓰는 test 데이터 기준으로 위험도 구간을 계산한다.
         tdf = load_test_data()
         if bundle is None:
@@ -701,12 +740,36 @@ with t2:
         metric_cols = [c for c in ("pr_auc", "roc_auc", "accuracy", "precision", "recall", "f1")
                        if c in cmp.columns]
         sort_key = "pr_auc" if "pr_auc" in metric_cols else "roc_auc"
-        show = cmp[["model"] + metric_cols]
-        st.dataframe(
-            show.sort_values(sort_key, ascending=False).reset_index(drop=True)
-                .style.format({c: "{:.4f}" for c in metric_cols})
-                .highlight_max(subset=[sort_key], color="#1a7a3a"),
-            width="stretch",
+        show = cmp[["model"] + metric_cols].sort_values(
+            sort_key, ascending=False
+        ).reset_index(drop=True)
+        column_labels = {
+            "model": "모델",
+            "pr_auc": "PR-AUC",
+            "roc_auc": "ROC-AUC",
+            "accuracy": "Accuracy",
+            "precision": "Precision",
+            "recall": "Recall",
+            "f1": "F1",
+        }
+        show = show.rename(columns=column_labels)
+        formatted_metrics = {column_labels[c]: "{:.4f}" for c in metric_cols}
+        styled_table = (
+            show.style
+            .format(formatted_metrics)
+            .apply(
+                lambda row: [
+                    "background-color: #eaf2ff; font-weight: 700;"
+                    if row.name == 0 else ""
+                    for _ in row
+                ],
+                axis=1,
+            )
+            .hide(axis="index")
+        )
+        st.markdown(
+            f'<div class="model-performance-table">{styled_table.to_html()}</div>',
+            unsafe_allow_html=True,
         )
         st.caption(
             f"Retention **제외** feature set 기준 · {sort_key.upper()} 내림차순. "
@@ -764,11 +827,6 @@ with t2:
         "누수 여부를 검증할 방법이 없기 때문이다 (report.md A-3).\n"
         "- 중요도는 예측 기여도이며 인과관계로 해석하지 않는다."
     )
-    roc = MODELING_IMAGES_DIR / "presentation_02_roc_curve.png"
-    if roc.exists():
-        with st.expander("ROC Curve 보기"):
-            st.image(str(roc), width="stretch")
-
 # ---------- 화면 3. 개별 고객 이탈 예측 ----------
 with t3:
     st.subheader("🎯 개별 고객 이탈 예측")
@@ -956,7 +1014,6 @@ with t4:
             except Exception as e:
                 st.error(f"고객군 분류에 실패했습니다. 입력값과 모델 파일을 확인하세요: {e}")
             else:
-                cluster_no = int(result["Cluster"])
                 segment_name = str(result["ClusterName"])
                 guide = SEGMENT_GUIDE.get(
                     segment_name,
@@ -973,9 +1030,8 @@ with t4:
                 with st.container(border=True):
                     result_col, detail_col = st.columns([1, 2])
                     with result_col:
-                        st.metric("분류된 고객군", f"Cluster {cluster_no}")
-                        st.success(f"{guide['icon']} **{guide['title']}**")
-                        st.caption(f"모델 세그먼트명: {segment_name}")
+                        st.metric("분류된 고객군", f"{guide['icon']} {guide['title']}")
+                        st.caption("고객 행동 특성 기반 분류")
 
                     with detail_col:
                         st.markdown("#### 고객군 특징")

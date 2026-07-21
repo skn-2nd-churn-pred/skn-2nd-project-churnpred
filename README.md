@@ -11,9 +11,8 @@
 ```bash
 git clone https://github.com/skn-2nd-churn-pred/skn-2nd-project-churnpred.git
 pip install -r requirements.txt
-# 데이터 2개를 내려받아 data/raw/ 에 배치 (Git에는 올라가지 않음):
+# 데이터를 내려받아 data/raw/ 에 배치 (Git에는 올라가지 않음):
 #   data/raw/cell2celltrain.csv   — 학습용 (Target 포함)
-#   data/raw/cell2cellholdout.csv — ⚠️ 라벨 없음: Test 사용 금지, Streamlit 시연용만
 ```
 
 모델 학습 후 시연:
@@ -37,14 +36,14 @@ streamlit run streamlit_app/app.py
   joblib.dump({"pipeline": pipe, "threshold": thr, "feature_names": [...]},
               "models/churn_pipeline.joblib")
   ```
-- **`streamlit_app/app.py`** — 단일 파일 3탭(현황·성능·예측). 저장 모델 로드(재학습 X), 입력폼은 원본 CSV에서 자동 생성 → 학습/화면 Feature 일치.
+- **`streamlit_app/app.py`** — 단일 파일 4탭(현황·모델 성능·이탈 예측·고객 세그먼트). 저장 모델 로드(재학습 X), 입력폼은 원본 CSV에서 자동 생성 → 학습/화면 Feature 일치.
 
 노트북 02에는 규율(먼저 분리 / Train에만 fit / 임계값은 Validation / Test 한 번 / Pipeline 저장)과 시작 코드·`TODO`가 있습니다. **최종 모델은 근거를 대며 직접 선정**(자동 아님).
 
 ## 이 데이터에서 주의할 것
 
 - **리텐션 3컬럼**(`RetentionCalls`·`RetentionOffersAccepted`·`MadeCallToRetentionTeam`) — 누수 의심(통화 고객 이탈률 45% vs 28%). 포함/제외 실험 후 근거와 함께 결정.
-- **holdout은 Test가 아님** — 라벨이 전부 결측. Train/Val/Test는 train CSV에서 3분할.
+- **Train/Validation/Test는 `cell2celltrain.csv`에서 60/20/20으로 분리**하고 역할을 엄격히 구분한다.
 - `CustomerID` 제외, `ServiceArea`(고유값 747) 그룹화 필요.
 
 ## 구조
