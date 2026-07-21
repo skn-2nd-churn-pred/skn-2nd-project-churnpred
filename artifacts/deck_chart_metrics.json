@@ -1,0 +1,16 @@
+{
+  "generated_from": "models/histgradientboosting_without_retention_final.joblib",
+  "test_n": 10210,
+  "test_pos": 2942,
+  "roc_auc": 0.6709,
+  "pr_auc": 0.4432,
+  "threshold": 0.5,
+  "contacted_at_threshold": 4738,
+  "contacted_pct": 0.4641,
+  "cumulative_gain": {
+    "top10pct": 0.1849,
+    "top20pct": 0.3266,
+    "top30pct": 0.4579,
+    "top50pct": 0.6764
+  }
+}
