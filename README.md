@@ -50,24 +50,51 @@ streamlit run streamlit_app/app.py
 ## 구조
 
 ```
-config.yaml             # 경로·Target (Churn / Yes=1)
-src/clean.py            # ★ 공통 정제 규칙 (A 관리, B·C import)
-src/predict.py          # 설정 로드 + 추론 (앱·노트북 공유)
-notebooks/01_eda 02_model 03_cluster    # ★ 실제 작업 (담당자별)
-streamlit_app/app.py    # 3탭 시연
-docs/                   # team_plan · project_plan · pipeline.png · handoff.png
-reports/                # preprocessing_report.md · modeling_report.md · clustering_report.md
-data/raw  models  artifacts             # 원본(Git 제외) · 모델 · 지표
+config.yaml                  # 경로·Target·최종 모델·임계값 (단일 출처)
+src/
+  clean.py                   # 공통 정제 규칙 (노트북 02·03이 import)
+  data.py                    # 로드·검증·3분할·전처리 Pipeline
+  predict.py                 # 설정 로드 + 추론 (앱·노트북·테스트 공유)
+  evaluate_test.py           # 최종 Test 평가 (1회만 실행)
+  save_metadata.py           # 모델 메타데이터 생성
+notebooks/                   # 00_data_check · 01_eda · 02_model · 03_cluster
+streamlit_app/app.py         # 4탭 시연 (현황·모델성능·이탈예측·고객세그먼트)
+docs/                        # team_plan · project_plan · pipeline.png · handoff.png
+reports/                     # preprocessing · modeling · clustering · test_report.md
+tests/test_inference.py      # 모델 로드·신규 고객 예측 검증
+data/  models/  artifacts/   # 원본·중간 데이터(Git 제외) · 모델 · 지표
 ```
+
+### 가이드 표준 구조와의 차이
+
+프로젝트 가이드의 권장 구조를 기준으로, 이 프로젝트에서 다르게 둔 부분과 이유입니다.
+
+| 가이드 | 이 프로젝트 | 이유 |
+| --- | --- | --- |
+| `docs/requirements.md`<br>`data_dictionary.md`<br>`validation_plan.md` | `docs/project_plan.md`<br>`reports/preprocessing_report.md` | 요구사항·Data Card·검증 계획을 두 문서에 통합. 내용은 모두 포함되어 있고, 파일을 쪼개면 같은 내용을 이중 관리하게 되어 합쳤습니다. |
+| `src/features.py`<br>`src/train_ml.py` | `src/data.py`<br>`notebooks/02_model.ipynb` | Feature 생성은 전처리와 분리되지 않아 `data.py`에 통합했습니다. 모델 학습은 비교·선정 과정을 보여줘야 해서 노트북에서 수행합니다(스크립트로 옮기면 노트북과 이중 관리). |
+| `src/evaluate.py` | `src/evaluate_test.py` | 이름을 좁혀서 **Test 1회 평가 전용**임을 드러냈습니다. 임계값 탐색 코드를 의도적으로 넣지 않아, 구조적으로 Test 오염을 막습니다. |
+| `streamlit_app/pages/` 3개 | `streamlit_app/app.py` 단일 파일 4탭 | 탭이 서로 같은 모델·데이터를 공유해 한 파일이 더 단순합니다. 군집 세그먼트 탭이 추가되어 4탭입니다. |
+| `reports/training_report.md` | `reports/modeling_report.md`<br>`clustering_report.md`<br>`test_report.md` | 담당자별로 파일을 나눠 같은 파일을 동시에 편집하는 머지 충돌을 막았습니다. |
+| 노트북 `01`~`03` | `00`~`03` (4개) | 데이터 점검과 EDA를 분리했고, 군집분석 노트북이 추가됐습니다. |
 
 | 필수 산출물 | 위치 |
 | --- | --- |
-| 전처리·학습·세그먼트 결과서 | `reports/preprocessing_report.md`, `modeling_report.md`, `clustering_report.md` |
-| 최종 모델 | `models/histgradientboosting_without_retention_final.joblib` (노트북 02에서 저장, 리텐션 컬럼 제외 버전으로 팀 확정) |
+| 데이터 전처리 결과서 | `reports/preprocessing_report.md` |
+| 모델 학습 결과서 | `reports/modeling_report.md` (+ `test_report.md` 최종 Test) |
+| 학습된 최종 모델 | `models/histgradientboosting_without_retention_final.joblib`<br>메타데이터: `artifacts/model_metadata.json` |
 | Streamlit 시연 | `streamlit_app/app.py` |
 | 발표자료 | `presentation.pdf` |
 
-> 발표 전 체크: README·발표자료의 성능 수치 = `artifacts/metrics.csv` 실제 수치와 일치할 것.
+### 검증·산출물 재생성
+
+```bash
+python tests/test_inference.py    # 모델 로드·신규 고객 예측 검증 (pytest 없이도 실행)
+python src/save_metadata.py       # artifacts/model_metadata.json 갱신
+python src/evaluate_test.py       # 최종 Test 평가 — 한 번만 실행
+```
+
+> 발표 전 체크: README·발표자료의 성능 수치 = `reports/test_report.md`·`artifacts/model_metadata.json`의 실제 수치와 일치할 것.
 
 ## 커밋 메시지 규칙
 
