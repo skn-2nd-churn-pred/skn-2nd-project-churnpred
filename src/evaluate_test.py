@@ -42,7 +42,7 @@ except ImportError:  # python src/evaluate_test.py 나 PyCharm 실행 버튼으�
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from src.predict import load_config, resolve_path
 
-TEST_PATH = "data/interim/test_without_retention.csv"
+TEST_PATH = "data/processed/test.csv"
 OUT_JSON = "artifacts/modeling/test_metrics.json"
 OUT_MD = "reports/test_report.md"
 

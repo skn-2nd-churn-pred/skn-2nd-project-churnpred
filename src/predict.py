@@ -40,7 +40,7 @@ def _feature_names_from_source(cfg: dict[str, Any]) -> list[str]:
     if not source.exists():
         raise FileNotFoundError(
             f"feature 목록을 복원할 파일이 없습니다: {source}\n"
-            "src/data.py를 실행해 data/interim 데이터를 생성하세요."
+            "src/data.py를 실행해 data/processed 최종 데이터를 생성하세요."
         )
     target = cfg["target"]["column"]
     columns = pd.read_csv(source, nrows=0).columns.tolist()

@@ -26,7 +26,7 @@ model:
   path: "models/histgradientboosting_without_retention_final.joblib"
   # 모델이 학습한 feature 이름·순서를 복원할 기준 파일.
   # 노트북은 Pipeline 객체만 저장하므로 feature 목록은 이 CSV의 컬럼에서 가져온다.
-  feature_source: "data/interim/val_without_retention.csv"
+  feature_source: "data/processed/val.csv"
   # 이탈/유지를 가르는 예측 임계값. Validation에서 결정하고 Test에는 고정 적용한다.
   threshold: 0.5
   # 전처리기(StandardScaler) — 화면에 실제 단위로 값을 보여줄 때 사용
