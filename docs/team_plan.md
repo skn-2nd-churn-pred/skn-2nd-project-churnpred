@@ -76,7 +76,7 @@
 
 - `main` 직접 작업 금지 → `feature/eda`, `feature/preprocess`, `feature/model`, `feature/streamlit`, `feature/cluster`
 - 결과서는 **담당자별 파일 분리**(`preprocessing_report.md`/`modeling_report.md`/`clustering_report.md`)로 관리 — 같은 파일을 여러 명이 동시에 채우지 않도록 머지 충돌 방지
-- 정제 규칙은 **`src/clean.py`로만 공유** (A가 작성·수정, B·C는 import만 — 노트북에 복붙 금지)
+- 공통 전처리 규칙은 **`src/data.py`와 전처리 결과서로 단일 관리**하고, 노트북에 중복 구현하지 않음
 - 하루 1회 이상 main에 통합하고 **전체 실행 확인** (7/20은 필수 통합일)
 - 커밋 금지: `data/raw/*.csv`(대용량 원본), `.env`, 가상환경 — `.gitignore`가 이미 차단
 - README 성능 수치 = 실제 `metrics.csv` 수치 일치 확인 후 발표
