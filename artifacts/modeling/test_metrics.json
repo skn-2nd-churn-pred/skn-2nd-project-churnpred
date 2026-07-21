@@ -1,0 +1,17 @@
+{
+  "evaluated_on": "2026-07-21",
+  "model_file": "histgradientboosting_without_retention_final.joblib",
+  "test_size": 10210,
+  "churn_rate": 0.2881,
+  "threshold": 0.5,
+  "pr_auc": 0.4432,
+  "roc_auc": 0.6709,
+  "accuracy": 0.6188,
+  "precision": 0.3997,
+  "recall": 0.6438,
+  "f1": 0.4932,
+  "true_negative": 4424,
+  "false_positive": 2844,
+  "false_negative": 1048,
+  "true_positive": 1894
+}
