@@ -2,8 +2,9 @@
 
 ## 1. 프로젝트 목적
 
-고객의 통화·요금·단말기·인구통계 정보를 활용해 고객 이탈 여부(`Churn`)를 예측한다.
-목표는 전체 Accuracy만 높이는 것이 아니라, 실제 이탈 고객을 놓치지 않고 찾아내 사전 대응 대상을 정하는 것이다.
+- 통신사 고객의 통화·요금·단말기·생활정보를 활용해 고객 이탈 여부(`Churn`)를 예측한다.
+- 목표는 불균형 데이터에서 Accuracy나 Precision만 높이는 것이 아니라, 실제 이탈 고객을 효과적으로 선별하는 것이다.
+- 즉 높은 정밀도만이 아니라, 임계값 조정 등을 고려하여 이탈 고객 탐지 성능과 경영 시 운영상의 최대 효율의 균형을 주안점에 둔 프로젝트이다.
 
 ## 2. 데이터 및 실험 설계
 
@@ -36,18 +37,25 @@
 
 ## 4. 전체 검증 성능 비교
 
-| model | feature_set | roc_auc | pr_auc | accuracy | precision | recall | f1 |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| HistGradientBoosting | Retention 포함 | 0.6787 | 0.4494 | 0.6206 | 0.4019 | 0.6492 | 0.4965 |
-| Random Forest | Retention 포함 | 0.6701 | 0.4354 | 0.6929 | 0.4587 | 0.3657 | 0.4070 |
-| Decision Tree | Retention 포함 | 0.6334 | 0.3963 | 0.5656 | 0.3628 | 0.6706 | 0.4708 |
-| Logistic Regression | Retention 포함 | 0.6296 | 0.3856 | 0.5933 | 0.3690 | 0.5795 | 0.4509 |
-| Dummy (Most Frequent) | Retention 포함 | 0.5000 | 0.2881 | 0.7119 | 0.0000 | 0.0000 | 0.0000 |
-| HistGradientBoosting | Retention 제외 | 0.6738 | 0.4453 | 0.6193 | 0.3996 | 0.6390 | 0.4917 |
-| Random Forest | Retention 제외 | 0.6665 | 0.4280 | 0.6916 | 0.4550 | 0.3555 | 0.3992 |
-| Decision Tree | Retention 제외 | 0.6257 | 0.3885 | 0.5603 | 0.3588 | 0.6683 | 0.4669 |
-| Logistic Regression | Retention 제외 | 0.6228 | 0.3764 | 0.5872 | 0.3650 | 0.5850 | 0.4495 |
-| Dummy (Most Frequent) | Retention 제외 | 0.5000 | 0.2881 | 0.7119 | 0.0000 | 0.0000 | 0.0000 |
+### 4-1. Retention 포함 모델
+
+| model | roc_auc | pr_auc | accuracy | precision | recall | f1 |
+| --- | --- | --- | --- | --- | --- | --- |
+| HistGradientBoosting | 0.6787 | 0.4494 | 0.6206 | 0.4019 | 0.6492 | 0.4965 |
+| Random Forest | 0.6701 | 0.4354 | 0.6929 | 0.4587 | 0.3657 | 0.4070 |
+| Decision Tree | 0.6334 | 0.3963 | 0.5656 | 0.3628 | 0.6706 | 0.4708 |
+| Logistic Regression | 0.6296 | 0.3856 | 0.5933 | 0.3690 | 0.5795 | 0.4509 |
+| Dummy (Most Frequent) | 0.5000 | 0.2881 | 0.7119 | 0.0000 | 0.0000 | 0.0000 |
+
+### 4-2. Retention 제외 모델
+
+| model | roc_auc | pr_auc | accuracy | precision | recall | f1 |
+| --- | --- | --- | --- | --- | --- | --- |
+| HistGradientBoosting | 0.6738 | 0.4453 | 0.6193 | 0.3996 | 0.6390 | 0.4917 |
+| Random Forest | 0.6665 | 0.4280 | 0.6916 | 0.4550 | 0.3555 | 0.3992 |
+| Decision Tree | 0.6257 | 0.3885 | 0.5603 | 0.3588 | 0.6683 | 0.4669 |
+| Logistic Regression | 0.6228 | 0.3764 | 0.5872 | 0.3650 | 0.5850 | 0.4495 |
+| Dummy (Most Frequent) | 0.5000 | 0.2881 | 0.7119 | 0.0000 | 0.0000 | 0.0000 |
 
 ## 5. 최종 채택안 및 근거
 
@@ -119,7 +127,7 @@ Retention 제외 버전에서 **HistGradientBoosting**은 비교 모델 중 PR-A
 
 ## 9. 운영 제안
 
-1. 사전 이탈 예방에는 최종 채택 모델인 `without_retention` HistGradientBoosting을 사용한다.
+1. 사전 이탈 예방에 최종 채택 모델인 `without_retention` HistGradientBoosting을 사용한다.
 2. 이탈 확률이 높은 고객부터 유지 캠페인 대상자로 우선 검토한다.
 3. 기준선은 예산, 고객 접촉 비용, 이탈 고객을 놓쳤을 때의 손실을 고려해 조정한다.
 
