@@ -286,8 +286,6 @@ Retention 포함 버전을 포함한 전체 비교표는 [`artifacts/modeling/mo
 **E05에서 0.5를 유지한 이유:**
 임계값은 성능이 아니라 **예산의 문제**입니다. 낮추면 더 많이 잡지만 접촉 비용이 늘고, 높이면 비용은 줄지만 놓치는 고객이 늘어납니다. 캠페인 단가와 이탈 손실이 정해지지 않은 상태에서는 균형점인 0.5를 기본값으로 두고, 운영 단계에서 조정할 수 있도록 `config.yaml` 한 곳에서 관리하도록 했습니다.
 
-**하이퍼파라미터 탐색(GridSearch 등)은 이번 범위에서 수행하지 않았습니다.** 데이터 버전 결정과 알고리즘 비교를 우선했고, 남은 개선 여지로 [12번](#12-한계-및-개선-방향)에 기록했습니다.
-
 ### 최종 모델
 
 | 항목 | 내용 |
@@ -522,34 +520,57 @@ python src/make_deck_charts.py    # 발표자료용 차트 생성
 
 ## 11. 수행 화면
 
-> ⚠️ **작성 필요** — `streamlit run streamlit_app/app.py`로 실행한 뒤 아래 4개 화면을 캡처해
-> `assets/images/screenshots/`에 저장하고, 각 항목의 주석(`<!-- -->`)을 해제하세요.
+저장된 모델을 실제로 불러와 고객 현황, 모델 성능, 개별 이탈 예측, 고객 세그먼트를 확인할 수 있습니다.
 
-### 현황
+### 1. 고객 현황
 
-`assets/images/screenshots/tab1_overview.png`
+전체 고객·이탈 고객·유지 고객·이탈률과 유지/이탈 분포를 확인합니다.
 
-<!-- ![현황 탭](assets/images/screenshots/tab1_overview.png) -->
+![고객 현황 및 유지·이탈 분포](assets/images/screenshots/tab1_overview.png)
 
-### 모델 성능
+EDA 핵심 인사이트와 위험도 구간별 고객 수를 통해 유지 활동의 우선순위를 확인합니다.
 
-`assets/images/screenshots/tab2_performance.png`
+![핵심 EDA 인사이트](assets/images/screenshots/tab1_insights.png)
 
-<!-- ![모델 성능 탭](assets/images/screenshots/tab2_performance.png) -->
+![위험도 구간별 고객 수](assets/images/screenshots/tab1_risk_distribution.png)
 
-### 개별 고객 이탈 예측
+### 2. 모델 성능
 
-`assets/images/screenshots/tab3_predict.png`
+동일한 Validation 조건에서 비교한 모델 성능과 최종 모델 선정 근거를 확인합니다.
 
-<!-- ![이탈 예측 탭](assets/images/screenshots/tab3_predict.png) -->
+![모델별 Validation 성능 비교](assets/images/screenshots/tab2_comparison.png)
 
-### 고객 세그먼트
+최종 HistGradientBoosting 모델의 핵심 지표와 Confusion Matrix를 제공합니다.
 
-`assets/images/screenshots/tab4_segment.png`
+![최종 모델 평가 및 Confusion Matrix](assets/images/screenshots/tab2_evaluation.png)
 
-<!-- ![고객 세그먼트 탭](assets/images/screenshots/tab4_segment.png) -->
+Feature Importance는 모델이 예측에 활용한 주요 신호를 보여주며, 인과관계를 의미하지는 않습니다.
 
-> 발표자료(`presentation.pptx`)의 시연 슬라이드에도 같은 화면이 들어가므로, 캡처를 한 번에 준비하면 양쪽에 함께 쓸 수 있습니다.
+![최종 모델 Feature Importance](assets/images/screenshots/tab2_importance.png)
+
+### 3. 개별 고객 이탈 예측
+
+예시 고객을 선택하거나 상위 5개 입력값을 조정해 실제 저장 모델의 이탈 확률을 다시 계산합니다.
+
+![개별 고객 이탈 예측 입력](assets/images/screenshots/tab3_input.png)
+
+이탈 확률·판정·위험 등급과 위험도에 맞춘 유지 활동을 함께 확인합니다.
+
+![개별 고객 이탈 예측 결과](assets/images/screenshots/tab3_result.png)
+
+### 4. 고객 세그먼트
+
+K-Means 기반 고객 유형과 각 유형에 맞는 관리 방향을 안내합니다.
+
+![분류 가능한 고객 유형](assets/images/screenshots/tab4_overview.png)
+
+고객 행동 정보를 입력하면 저장된 군집 모델이 고객 유형을 분류합니다.
+
+![신규 고객 세그먼트 입력](assets/images/screenshots/tab4_input.png)
+
+분류 결과와 고객군 특성, 추천 대응 활동을 제시합니다.
+
+![신규 고객 세그먼트 결과](assets/images/screenshots/tab4_result.png)
 
 ---
 
@@ -560,7 +581,6 @@ python src/make_deck_charts.py    # 발표자료용 차트 생성
 | **개별 변수의 신호가 약함** — Target과의 상관계수가 최대 0.10 | PR-AUC 0.44, Recall 0.64 수준으로 성능 상한이 존재. 통신 이탈 예측이 학계에서도 어려운 문제로 알려진 것과 일치 | 월별 이용 이력을 확보해 "변화의 추세"를 Feature로 생성 |
 | **리텐션 컬럼 누수 여부 미확정** | 성능이 더 좋은 데이터 버전을 근거 부족으로 포기 | 접촉 시점(timestamp) 컬럼 확보 후 재검증 |
 | **스냅샷 데이터, 수집 시점 불명** | 현재 통신 시장(5G 전환 등)과의 차이를 알 수 없음 | 최신 데이터 확보, 주기적 재학습 체계 수립 |
-| **하이퍼파라미터 탐색 미수행** | 부스팅 모델의 성능 여지를 다 쓰지 못했을 가능성 | GridSearchCV/Optuna로 Validation 기준 탐색 |
 | **비용 정보 부재로 임계값이 임의** | 0.5가 실제 운영 최적점이라는 근거 없음 | 접촉 단가·이탈 손실을 입력받아 순이익 최대 임계값 자동 산출 |
 | **일괄 예측(FR-06) 미구현** | 실무에서 전체 고객 대상 배치 예측 불가 | CSV 업로드 → 일괄 스코어링 → 대상자 목록 다운로드 기능 추가 |
 | **캠페인 효과 미검증** | 모델이 실제 잔존율을 높이는지 확인되지 않음 | 모델 선정 대상 vs 무작위 대상 A/B 테스트 |
