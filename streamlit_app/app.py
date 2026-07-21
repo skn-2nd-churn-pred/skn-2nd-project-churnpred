@@ -1,7 +1,8 @@
 """Streamlit 시연 (단일 파일, 4개 탭).
 
 실행: streamlit run streamlit_app/app.py
-- 저장된 최종 모델(models/churn_pipeline.joblib)을 불러온다. 앱에서 재학습하지 않는다.
+- 저장된 최종 모델(config.yaml의 model.path)을 불러온다. 앱에서 재학습하지 않는다.
+  최종 모델은 리텐션 컬럼을 제외한 버전이다 (reports/report.md A-3 팀 결정).
 - 입력을 바꾸면 확률도 실제로 바뀐다.
 - 원본 CSV가 없으면 data/interim의 전처리 데이터(train+val+test)로 대체한다.
 """
@@ -103,7 +104,6 @@ KEY_FEATURES = {
     "PercChangeMinutes": "통화량 증감(분)",
     "DroppedBlockedCalls": "끊김·차단 통화",
     "CustomerCareCalls": "고객센터 통화",
-    "RetentionCalls": "리텐션팀 통화",
     "MonthsInService": "가입 개월 수",
     "ActiveSubs": "활성 회선 수",
     "Handsets": "보유 단말 수",
@@ -128,7 +128,7 @@ def load_customers() -> pd.DataFrame | None:
         tcol, pos = cfg["target"]["column"], str(cfg["target"]["positive_label"]).strip().lower()
         df["_churn"] = df[tcol].astype(str).str.strip().str.lower().eq(pos).astype(int)
         return df
-    parts = [ROOT / "data" / "interim" / f"{s}_with_retention.csv"
+    parts = [ROOT / "data" / "interim" / f"{s}_without_retention.csv"
              for s in ("train", "val", "test")]
     if not all(p.exists() for p in parts):
         return None
@@ -140,11 +140,27 @@ def load_customers() -> pd.DataFrame | None:
 @st.cache_data
 def load_scoring_data() -> pd.DataFrame | None:
     """모델 입력용 전처리 완료 데이터 (학습 때와 같은 feature 이름·자료형)."""
-    parts = [ROOT / "data" / "interim" / f"{s}_with_retention.csv"
+    parts = [ROOT / "data" / "interim" / f"{s}_without_retention.csv"
              for s in ("train", "val", "test")]
     if not all(p.exists() for p in parts):
         return None
     df = pd.concat([pd.read_csv(p) for p in parts], ignore_index=True)
+    df["_churn"] = df["Churn"]
+    return df
+
+
+@st.cache_data
+def load_validation_data() -> pd.DataFrame | None:
+    """위험도 분포 계산용 validation 데이터.
+
+    전체(train+val+test)로 위험도를 계산하면 모델이 학습에 쓴 데이터까지
+    채점하게 되어 실제보다 낙관적인 분포가 나온다. 학습에 쓰지 않은
+    validation만 사용해야 현실적인 위험 고객 규모를 보여줄 수 있다.
+    """
+    path = ROOT / "data" / "interim" / "val_without_retention.csv"
+    if not path.exists():
+        return None
+    df = pd.read_csv(path)
     df["_churn"] = df["Churn"]
     return df
 
@@ -162,10 +178,34 @@ def score_customers(df: pd.DataFrame) -> pd.Series:
 
 
 @st.cache_data
+def final_model_metrics(vdf: pd.DataFrame, _bundle: dict) -> dict[str, float]:
+    """최종 모델의 validation 성능을 직접 계산한다.
+
+    모델 파일에 지표가 함께 저장돼 있지 않아도 동작하며,
+    임계값(config의 model.threshold)을 바꾸면 즉시 반영된다.
+    """
+    from sklearn.metrics import (average_precision_score, confusion_matrix, f1_score,
+                                 precision_score, recall_score, roc_auc_score)
+
+    y = vdf["_churn"]
+    proba = score_customers(vdf)
+    pred = (proba >= _bundle["threshold"]).astype(int)
+    tn, fp, fn, tp = confusion_matrix(y, pred, labels=[0, 1]).ravel()
+    return {
+        "roc_auc": roc_auc_score(y, proba),
+        "pr_auc": average_precision_score(y, proba),
+        "precision": precision_score(y, pred, zero_division=0),
+        "recall": recall_score(y, pred, zero_division=0),
+        "f1": f1_score(y, pred, zero_division=0),
+        "tn": int(tn), "fp": int(fp), "fn": int(fn), "tp": int(tp),
+    }
+
+
+@st.cache_data
 def load_scaler_stats() -> dict[str, tuple[float, float]]:
     """전처리기(StandardScaler)의 평균·표준편차 — 표준화 값을 실제 단위로 오가는 데 사용."""
     import joblib
-    path = ROOT / "artifacts" / "preprocessor_with_retention.joblib"
+    path = resolve_path(cfg["model"]["preprocessor_path"])
     if not path.exists():
         return {}
     pre = joblib.load(path)
@@ -249,6 +289,12 @@ with t1:
         c3.metric("유지 고객", f"{int((1 - y).sum()):,}명")
         c4.metric("이탈률", f"{y.mean():.1%}")
 
+        st.caption(
+            "전체 고객 대비 이탈률 28.8%. 통신업계 연간 이탈률이 통상 20~30% 수준인 점을 "
+            "감안하면 극단적 불균형은 아니지만, 이탈 고객이 소수 클래스이므로 "
+            "Accuracy 대신 Recall·PR-AUC를 우선 지표로 사용한다."
+        )
+
         left, right = st.columns(2)
         with left:
             st.subheader("유지 / 이탈 분포")
@@ -267,21 +313,44 @@ with t1:
         st.subheader("핵심 인사이트 (EDA)")
         st.markdown(
             "- **단말 사용일수(CurrentEquipmentDays)가 길수록 이탈률 상승** — "
-            "오래된 단말을 쓰는 고객은 교체 시점에 타사로 이동할 위험이 크다.\n"
-            "- **가입 초기(MonthsInService 낮음) 고객의 이탈률이 높음** — 온보딩 구간 관리가 필요하다.\n"
+            "6개월 미만 22.9% → 2년 이상 36.1%. 오래된 단말을 쓰는 고객은 "
+            "교체 시점에 타사로 이동할 위험이 크다.\n"
+            "- **구형(웹 미지원) 단말 고객의 이탈률(37.4%)이 웹 지원 단말(27.9%)보다 높음** — "
+            "단말 노후도를 기준으로 업그레이드 프로모션 대상을 선정할 근거가 된다.\n"
             "- **리텐션팀 통화 경험 고객의 이탈률(45.0%)이 미경험(28.2%)보다 높음** — "
-            "이미 이탈 의사를 보인 신호이므로 모델은 retention 포함/제외 두 버전으로 비교해 확정했다."
+            "이미 이탈 의사를 보인 고객을 리텐션팀이 먼저 접촉한 역인과관계로 보인다. "
+            "포함/제외 두 버전을 비교한 결과 성능 차이가 미미해(ROC-AUC +0.005) "
+            "**리텐션 컬럼을 제외한 모델을 최종 채택**했다."
         )
+
+        with st.expander("📊 EDA 상세 차트 보기"):
+            figures = [
+                ("02_equipmentdays_by_churn.png",
+                 "단말 사용일수 분포 — 이탈 고객이 오래된 단말 쪽에 치우쳐 있다."),
+                ("05_creditrating_churn_rate.png",
+                 "신용등급별 이탈률 — 등급이 높을수록 이탈이 낮을 것이라는 기대와 달리, "
+                 "1-Highest(30.8%)가 5-Low(22.1%)보다 오히려 높다. "
+                 "트리 계열 모델이 이런 비선형 관계를 잡아내는 것이 중요한 이유다."),
+                ("06_region_churn_rate.png",
+                 "지역(대도시권)별 이탈률 편차 — 전국 단일 캠페인보다 지역별 강도 조절이 유리하다."),
+            ]
+            for filename, caption in figures:
+                path = ROOT / "reports" / "figures" / filename
+                if path.exists():
+                    st.image(str(path), use_container_width=True)
+                    st.caption(caption)
 
         bundle, err = get_bundle()
         st.subheader("위험도 구간별 고객 수")
-        sdf = load_scoring_data()
+        # 학습에 쓰지 않은 validation 기준으로 계산해야 실제 운영 상황과 가깝다.
+        vdf = load_validation_data()
         if bundle is None:
             st.warning(err)
-        elif sdf is None:
-            st.warning("전처리 데이터(data/interim)가 없어 위험도 구간을 계산할 수 없습니다.")
+        elif vdf is None:
+            st.warning("검증 데이터(data/interim/val_without_retention.csv)가 없어 "
+                       "위험도 구간을 계산할 수 없습니다.")
         else:
-            proba = score_customers(sdf)
+            proba = score_customers(vdf)
             grades = pd.cut(proba, bins=[0, 0.4, 0.7, 1.0],
                             labels=["저위험", "중위험", "고위험"], include_lowest=True)
             counts = grades.value_counts().reindex(["고위험", "중위험", "저위험"])
@@ -289,6 +358,12 @@ with t1:
             for col, grade in zip((g1, g2, g3), counts.index):
                 col.metric(f"{GRADE_ICON[grade]} {grade}", f"{int(counts[grade]):,}명")
             st.bar_chart(counts)
+            st.caption(
+                f"**검증 데이터 {len(vdf):,}명 기준** (학습에 사용하지 않은 데이터라 "
+                "실제 운영 시 분포에 가깝다). "
+                "등급 구간(0.4·0.7)은 캠페인 우선순위를 나누기 위한 기준이며, "
+                "이탈/유지를 판정하는 예측 임계값과는 별개다."
+            )
 
 # ---------- 화면 2. 모델 성능 ----------
 with t2:
@@ -296,54 +371,74 @@ with t2:
     long_path = MODELING_DIR / "model_metrics_long.csv"
     if long_path.exists():
         cmp = pd.read_csv(long_path)
-        cmp = cmp[cmp["feature_set"] == "with_retention"]
-        show = cmp[["model", "roc_auc", "accuracy", "precision", "recall", "f1"]]
+        # 최종 채택한 Retention 제외 버전 기준으로 보여준다 (report.md A-3 결정).
+        cmp = cmp[cmp["feature_set"] == "without_retention"]
+        # 불균형 데이터라 PR-AUC를 우선 지표로 쓴다 (없는 구버전 CSV도 동작하도록 방어).
+        metric_cols = [c for c in ("pr_auc", "roc_auc", "accuracy", "precision", "recall", "f1")
+                       if c in cmp.columns]
+        sort_key = "pr_auc" if "pr_auc" in metric_cols else "roc_auc"
+        show = cmp[["model"] + metric_cols]
         st.dataframe(
-            show.sort_values("roc_auc", ascending=False).reset_index(drop=True)
-                .style.format({c: "{:.4f}" for c in show.columns[1:]})
-                .highlight_max(subset=["roc_auc"], color="#1a7a3a"),
+            show.sort_values(sort_key, ascending=False).reset_index(drop=True)
+                .style.format({c: "{:.4f}" for c in metric_cols})
+                .highlight_max(subset=[sort_key], color="#1a7a3a"),
             use_container_width=True,
         )
-        st.caption("Retention 포함 feature set 기준. 자세한 비교는 reports/modeling_report.md 참고.")
+        st.caption(
+            f"Retention **제외** feature set 기준 · {sort_key.upper()} 내림차순. "
+            "자세한 비교는 reports/modeling_report.md 참고."
+        )
+        if "pr_auc" not in cmp.columns:
+            st.info("PR-AUC·Dummy 기준선을 보려면 노트북 02를 다시 실행해 "
+                    "artifacts/modeling/model_metrics_long.csv를 갱신하세요.")
     else:
         st.info("노트북 02를 실행하면 모델 비교표가 여기에 표시됩니다.")
 
     bundle, err = get_bundle()
+    vdf = load_validation_data()
     if bundle is None:
         st.warning(err)
+    elif vdf is None:
+        st.warning("검증 데이터가 없어 최종 모델 성능을 계산할 수 없습니다.")
     else:
-        m = bundle.get("metrics", {})
-        st.subheader(f"최종 모델: {m.get('model_name', 'HistGradientBoosting')}")
+        # 저장 파일에 지표가 없을 수 있으므로 validation에서 직접 계산한다
+        # (리포트 수치와 항상 일치하고, 임계값을 바꾸면 즉시 반영된다).
+        m = final_model_metrics(vdf, bundle)
+        st.subheader("최종 모델: HistGradientBoosting (Retention 제외)")
         c1, c2, c3, c4, c5 = st.columns(5)
-        c1.metric("ROC-AUC", f"{m.get('roc_auc', 0):.4f}")
-        c2.metric("PR-AUC", f"{m.get('pr_auc', 0):.4f}")
-        c3.metric("Precision", f"{m.get('precision', 0):.4f}")
-        c4.metric("Recall", f"{m.get('recall', 0):.4f}")
-        c5.metric("F1", f"{m.get('f1', 0):.4f}")
-        st.caption(f"평가: {m.get('eval_split', 'validation')} · 임계값 {bundle['threshold']}")
+        c1.metric("ROC-AUC", f"{m['roc_auc']:.4f}")
+        c2.metric("PR-AUC", f"{m['pr_auc']:.4f}")
+        c3.metric("Precision", f"{m['precision']:.4f}")
+        c4.metric("Recall", f"{m['recall']:.4f}")
+        c5.metric("F1", f"{m['f1']:.4f}")
+        st.caption(
+            f"평가: validation {len(vdf):,}명 · 임계값 {bundle['threshold']} · "
+            "ROC-AUC·PR-AUC는 임계값과 무관하고, Precision·Recall·F1은 임계값에 따라 달라진다."
+        )
 
-        cm = m.get("confusion_matrix")
-        if cm:
-            st.subheader("Confusion Matrix (validation)")
-            st.dataframe(pd.DataFrame(
-                [[f"{cm['tn']:,} (TN)", f"{cm['fp']:,} (FP)"],
-                 [f"{cm['fn']:,} (FN)", f"{cm['tp']:,} (TP)"]],
-                index=["실제 유지", "실제 이탈"], columns=["예측 유지", "예측 이탈"],
-            ), use_container_width=True)
-            st.caption(
-                f"실제 이탈 {cm['fn'] + cm['tp']:,}명 중 {cm['tp']:,}명 탐지 "
-                f"(Recall {m.get('recall', 0):.1%}). FP {cm['fp']:,}명은 캠페인 비용과 "
-                "직결되므로 임계값으로 조정한다."
-            )
+        st.subheader("Confusion Matrix (validation)")
+        st.dataframe(pd.DataFrame(
+            [[f"{m['tn']:,} (TN)", f"{m['fp']:,} (FP)"],
+             [f"{m['fn']:,} (FN)", f"{m['tp']:,} (TP)"]],
+            index=["실제 유지", "실제 이탈"], columns=["예측 유지", "예측 이탈"],
+        ), use_container_width=True)
+        st.caption(
+            f"실제 이탈 {m['fn'] + m['tp']:,}명 중 {m['tp']:,}명 탐지 "
+            f"(Recall {m['recall']:.1%}). FP {m['fp']:,}명은 캠페인 비용과 "
+            "직결되므로 임계값으로 조정한다."
+        )
 
     st.subheader("중요 Feature와 해석")
-    fi = MODELING_DIR / "presentation_04_feature_importance.png"
-    if fi.exists():
+    fi = next((p for p in (MODELING_DIR / "presentation_05_feature_importance.png",
+                           MODELING_DIR / "presentation_04_feature_importance.png")
+               if p.exists()), None)
+    if fi:
         st.image(str(fi), use_container_width=True)
     st.markdown(
         "- 단말 사용일수·가입 개월 수·통화량 증감 등 **이용 행태 변화** 지표가 상위권이다.\n"
-        "- 리텐션팀 통화는 이탈 의사가 이미 드러난 신호로, 예측 기여도가 높지만 인과가 아니다.\n"
-        "- 중요도는 예측 기여도이며 인과관계로 해석하지 않는다 (modeling_report 9장)."
+        "- 최종 모델은 리텐션 관련 컬럼을 **제외**하고 학습했다 — 접촉 시점을 확인할 수 없어 "
+        "누수 여부를 검증할 방법이 없기 때문이다 (report.md A-3).\n"
+        "- 중요도는 예측 기여도이며 인과관계로 해석하지 않는다."
     )
     roc = MODELING_DIR / "presentation_02_roc_curve.png"
     if roc.exists():
@@ -391,20 +486,14 @@ with t3:
                         v = v * s + m
                     with cols[i % 2]:
                         edited[feat] = st.number_input(f"{label} ({feat})", value=round(v, 1))
-                c1, c2 = st.columns(2)
-                with c1:
-                    retention = st.selectbox(
-                        "리텐션팀 통화 경험 (MadeCallToRetentionTeam)", ["No", "Yes"],
-                        index=int(base.get("MadeCallToRetentionTeam_Yes", 0) == 1),
-                    )
-                with c2:
-                    current = next(
-                        (c for c in CREDIT_COLS if base.get(c, 0) == 1), CREDIT_COLS[2])
-                    credit = st.selectbox(
-                        "신용 등급 (CreditRating)",
-                        CREDIT_COLS, index=CREDIT_COLS.index(current),
-                        format_func=lambda c: c.split("_", 1)[1],
-                    )
+                # 리텐션 컬럼은 최종 모델에서 제외됐으므로 입력받지 않는다 (report.md A-3).
+                current = next(
+                    (c for c in CREDIT_COLS if base.get(c, 0) == 1), CREDIT_COLS[2])
+                credit = st.selectbox(
+                    "신용 등급 (CreditRating)",
+                    CREDIT_COLS, index=CREDIT_COLS.index(current),
+                    format_func=lambda c: c.split("_", 1)[1],
+                )
                 go = st.form_submit_button("예측 실행", type="primary")
 
             if go:
@@ -414,8 +503,6 @@ with t3:
                         form[feat] = (v - m) / s
                     else:
                         form[feat] = v
-                form["MadeCallToRetentionTeam_Yes"] = float(retention == "Yes")
-                form["MadeCallToRetentionTeam_No"] = float(retention == "No")
                 for c in CREDIT_COLS:
                     form[c] = float(c == credit)
                 try:

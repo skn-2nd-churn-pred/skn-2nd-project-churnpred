@@ -1,9 +1,14 @@
 """설정 로드 + 추론 (앱·노트북 공유). src의 유일한 모듈.
 
-노트북 02에서 아래 형식으로 저장하면 Streamlit이 그대로 동작한다:
+load_model()은 두 가지 저장 형식을 모두 지원한다.
 
-    joblib.dump({"pipeline": pipe, "threshold": thr, "feature_names": [...]},
-                "models/churn_pipeline.joblib")
+1) 번들 dict — 모델·임계값·feature 목록을 함께 저장한 형태 (권장):
+       joblib.dump({"pipeline": pipe, "threshold": thr, "feature_names": [...]}, path)
+
+2) Pipeline 객체 단독 — 노트북 02가 현재 저장하는 형태:
+       joblib.dump(pipe, path)
+   이 경우 threshold는 config.yaml의 model.threshold에서,
+   feature_names는 model.feature_source CSV의 컬럼 순서에서 복원한다.
 """
 from __future__ import annotations
 
@@ -29,12 +34,45 @@ def load_config() -> dict[str, Any]:
         return yaml.safe_load(f)
 
 
+def _feature_names_from_source(cfg: dict[str, Any]) -> list[str]:
+    """모델이 학습한 feature 이름·순서를 기준 CSV의 컬럼에서 복원한다."""
+    source = resolve_path(cfg["model"]["feature_source"])
+    if not source.exists():
+        raise FileNotFoundError(
+            f"feature 목록을 복원할 파일이 없습니다: {source}\n"
+            "src/data.py를 실행해 data/interim 데이터를 생성하세요."
+        )
+    target = cfg["target"]["column"]
+    columns = pd.read_csv(source, nrows=0).columns.tolist()
+    return [c for c in columns if c != target]
+
+
 @lru_cache(maxsize=1)
 def load_model() -> dict:
-    path = resolve_path(load_config()["output"]["model_path"])
+    """{pipeline, threshold, feature_names} 형태로 정규화해서 반환한다."""
+    cfg = load_config()
+    path = resolve_path(cfg["model"]["path"])
     if not path.exists():
         raise FileNotFoundError(f"모델이 없습니다: {path}\n노트북 02에서 학습해 저장하세요.")
-    return joblib.load(path)
+
+    obj = joblib.load(path)
+    if isinstance(obj, dict):        # 형식 1) 이미 번들이면 그대로 사용
+        return obj
+
+    # 형식 2) Pipeline 객체 단독 -> config와 기준 CSV로 나머지를 채워 번들을 만든다.
+    feature_names = _feature_names_from_source(cfg)
+    expected = getattr(obj, "n_features_in_", None)
+    if expected is not None and expected != len(feature_names):
+        raise ValueError(
+            f"모델이 기대하는 feature 수({expected})와 "
+            f"{cfg['model']['feature_source']}의 컬럼 수({len(feature_names)})가 다릅니다. "
+            "config.yaml의 model.feature_source가 이 모델을 학습한 데이터와 같은지 확인하세요."
+        )
+    return {
+        "pipeline": obj,
+        "threshold": float(cfg["model"]["threshold"]),
+        "feature_names": feature_names,
+    }
 
 
 def risk_grade(p: float) -> str:

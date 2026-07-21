@@ -21,7 +21,16 @@ target:
     "1": "이탈 고객 (churn)"
     "0": "유지 고객 (retained)"
 
+model:
+  # 노트북 02가 저장한 최종 모델 (리텐션 컬럼 제외 버전으로 팀 확정 — report.md A-3 참고)
+  path: "models/histgradientboosting_without_retention_final.joblib"
+  # 모델이 학습한 feature 이름·순서를 복원할 기준 파일.
+  # 노트북은 Pipeline 객체만 저장하므로 feature 목록은 이 CSV의 컬럼에서 가져온다.
+  feature_source: "data/interim/val_without_retention.csv"
+  # 이탈/유지를 가르는 예측 임계값. Validation에서 결정하고 Test에는 고정 적용한다.
+  threshold: 0.5
+  # 전처리기(StandardScaler) — 화면에 실제 단위로 값을 보여줄 때 사용
+  preprocessor_path: "artifacts/preprocessor_without_retention.joblib"
+
 output:
-  # 노트북 02에서 학습한 최종 모델을 여기에 저장 -> Streamlit/predict.py 가 불러온다.
-  model_path: "models/churn_pipeline.joblib"
   metrics_path: "artifacts/metrics.csv"   # 성능 탭이 읽는 모델 비교표
