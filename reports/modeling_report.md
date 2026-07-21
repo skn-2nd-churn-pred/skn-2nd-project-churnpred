@@ -16,7 +16,7 @@
 
 - 학습에는 `train_with_retention.csv`, `train_without_retention.csv`만 사용했다.
 - 검증에는 `val_with_retention.csv`, `val_without_retention.csv`만 사용했다.
-- Retention 포함 버전에는 `RetentionCalls`, `RetentionOffersAccepted`, `MadeCallToRetentionTeam_No`, `MadeCallToRetentionTeam_Yes` 변수가 추가된다.
+- Retention 포함 버전에는 `RetentionCalls`, `RetentionOffersAccepted`, 유지팀 연락 여부 관련 변수가 추가된다.
 - test 데이터는 모델 확정 후 최종 확인용으로 남겨 둔다.
 
 ## 3. 비교 모델과 평가 지표

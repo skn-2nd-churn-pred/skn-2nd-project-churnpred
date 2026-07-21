@@ -36,6 +36,7 @@
   },
   "metrics": {
     "validation": {
+      "pr_auc": 0.4453,
       "roc_auc": 0.6738,
       "accuracy": 0.6193,
       "precision": 0.3996,
