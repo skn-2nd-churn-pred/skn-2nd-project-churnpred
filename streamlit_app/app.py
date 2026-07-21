@@ -19,7 +19,7 @@ if str(ROOT) not in sys.path:
 
 from src.predict import load_config, load_model, predict_one, resolve_path  # noqa: E402
 
-st.set_page_config(page_title="고객 이탈 예측", page_icon="📉", layout="wide")
+st.set_page_config(page_title="Cell2Cell 고객 이탈 예측", page_icon="📉", layout="wide")
 
 # 공통 화면 스타일: 시스템 한글 폰트를 사용하고 탭·제목·카드 간격을 통일한다.
 st.markdown(
@@ -576,7 +576,7 @@ def render_action_cards(actions: list[dict[str, str]]) -> None:
                 st.write(action["description"])
 
 
-st.title("📉 고객 이탈 예측")
+st.title("📉 Cell2Cell 고객 이탈 예측")
 t1, t2, t3, t4 = st.tabs(["현황", "모델 성능", "이탈 예측", "고객 세그먼트"])
 
 # ---------- 화면 1. 고객 현황 ----------
