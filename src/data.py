@@ -38,6 +38,7 @@ project/
 
 import json
 from pathlib import Path
+from shutil import copy2
 from typing import Optional
 
 import joblib
@@ -59,8 +60,9 @@ HOLDOUT_PATH = ROOT_DIR / "data" / "raw" / "cell2cellholdout.csv"   # 참고용,
 
 # data/interim: 리텐션 포함/제외 "실험용" 두 버전을 여기에 저장한다 (아직 확정 아님)
 INTERIM_DIR = ROOT_DIR / "data" / "interim"
-# data/processed: 팀이 최종 버전을 확정한 뒤 promote_to_processed()로만 채워지는 폴더.
-# 이 스크립트를 그냥 실행하는 것만으로는 여기에 아무것도 안 생긴다.
+# data/processed: 확정된 without_retention 버전만 표준 파일명(train/val/test)으로 저장한다.
+PROCESSED_DIR = ROOT_DIR / "data" / "processed"
+FINAL_VARIANT = "without_retention"
 ARTIFACT_DIR = ROOT_DIR / "artifacts"
 
 TARGET_COL = "Churn"          # "Yes"/"No" -> 1/0 으로 변환해서 사용
@@ -265,6 +267,16 @@ def process_variant(train_df, ytr, val_df, yval, test_df, yte,
 
 
 
+def promote_to_processed(variant_name: str = FINAL_VARIANT) -> None:
+    """확정된 실험 버전만 data/processed의 최종 학습 테이블로 승격한다."""
+    PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
+    for split in ("train", "val", "test"):
+        source = INTERIM_DIR / f"{split}_{variant_name}.csv"
+        if not source.exists():
+            raise FileNotFoundError(f"승격할 실험 데이터가 없습니다: {source}")
+        copy2(source, PROCESSED_DIR / f"{split}.csv")
+    print(f"[최종 데이터 승격] {variant_name} -> data/processed/train.csv, val.csv, test.csv")
+
 # 6. 메인 실행
 def main():
     INTERIM_DIR.mkdir(parents=True, exist_ok=True)
@@ -297,6 +309,9 @@ def main():
     print("\n=== [버전 2] 리텐션 컬럼 제외 ===")
     process_variant(train_df, ytr, val_df, yval, test_df, yte,
                      NUMERIC_COLS, CATEGORICAL_COLS, "without_retention")
+
+    # 팀이 최종 채택한 리텐션 제외 버전을 processed 폴더의 표준 파일명으로 저장한다.
+    promote_to_processed()
 
     # 4) 메타데이터 저장
     metadata = {

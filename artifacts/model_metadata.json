@@ -10,7 +10,7 @@
   "data": {
     "source": "data/raw/cell2celltrain.csv",
     "split": "Train 60% / Validation 20% / Test 20% (stratify=Churn, random_state=42)",
-    "feature_source": "data/interim/val_without_retention.csv",
+    "feature_source": "data/processed/val.csv",
     "n_features": 126,
     "excluded_columns": {
       "CustomerID": "식별자 — 예측 정보 없음",
