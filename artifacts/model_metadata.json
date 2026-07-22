@@ -1,16 +1,21 @@
 {
   "trained_on": "2026-07-21",
+  "metadata_generated_at": "2026-07-22T09:43:23+09:00",
   "model": {
     "name": "HistGradientBoosting",
     "file": "histgradientboosting_without_retention_final.joblib",
     "type": "Pipeline",
+    "pipeline_type": "Pipeline",
+    "estimator_type": "HistGradientBoostingClassifier",
     "feature_set": "without_retention",
     "selection_reason": "Retention 제외 버전 중 PR-AUC가 가장 높았다. 리텐션 컬럼은 접촉 시점을 확인할 수 없어 누수 여부를 검증할 방법이 없으므로 제외했다 (reports/modeling_report.md 5절)."
   },
   "data": {
     "source": "data/raw/cell2celltrain.csv",
+    "source_sha256": "3f6b8ff0b8e8f5975aa0de9f1f54967e6c8cb867a9bec6cbb64f4c8990f9a645",
     "split": "Train 60% / Validation 20% / Test 20% (stratify=Churn, random_state=42)",
     "feature_source": "data/processed/val.csv",
+    "feature_source_sha256": "be14b77527df5db78c16d41d2bc968688e41de8105c1fb729bf8037e52673c12",
     "n_features": 126,
     "excluded_columns": {
       "CustomerID": "식별자 — 예측 정보 없음",
@@ -44,6 +49,11 @@
       "f1": 0.4917
     },
     "test": {
+      "evaluated_on": "2026-07-21",
+      "model_file": "histgradientboosting_without_retention_final.joblib",
+      "test_size": 10210,
+      "churn_rate": 0.2881,
+      "threshold": 0.5,
       "pr_auc": 0.4432,
       "roc_auc": 0.6709,
       "accuracy": 0.6188,
@@ -186,6 +196,13 @@
   ],
   "versions": {
     "python": "3.12.10",
+    "pandas": "3.0.3",
+    "numpy": "2.4.6",
+    "scikit-learn": "1.9.0",
+    "joblib": "1.5.3"
+  },
+  "metadata_environment_versions": {
+    "python": "3.12.13",
     "pandas": "3.0.3",
     "numpy": "2.4.6",
     "scikit-learn": "1.9.0",
