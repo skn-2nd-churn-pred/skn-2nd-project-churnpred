@@ -21,6 +21,21 @@ target:
     "0": "유지 고객 (retained)"
 
 model:
+  # 최종 모델 식별 정보. save_metadata.py와 모델 비교표가 함께 사용한다.
+  name: "HistGradientBoosting"
+  feature_set: "without_retention"
+  trained_on: "2026-07-21"
+  selection_reason: >-
+    Retention 제외 버전 중 PR-AUC가 가장 높았다. 리텐션 컬럼은 접촉 시점을
+    확인할 수 없어 누수 여부를 검증할 방법이 없으므로 제외했다
+    (reports/modeling_report.md 5절).
+  # 모델을 학습하고 저장한 환경. metadata 생성 환경과 구분해 기록한다.
+  training_versions:
+    python: "3.12.10"
+    pandas: "3.0.3"
+    numpy: "2.4.6"
+    scikit-learn: "1.9.0"
+    joblib: "1.5.3"
   # 노트북 02가 저장한 최종 모델 (리텐션 컬럼 제외 버전으로 팀 확정 — report.md A-3 참고)
   path: "models/histgradientboosting_without_retention_final.joblib"
   # 모델이 학습한 feature 이름·순서를 복원할 기준 파일.
